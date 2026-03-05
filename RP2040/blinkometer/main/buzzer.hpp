@@ -6,7 +6,7 @@ public:
 		: buzzer_pin(buzzer_pin)
 	{
 		pinMode(buzzer_pin, OUTPUT);
-		pinMode(LED_BUILTIN, OUTPUT);
+		//pinMode(LED_BUILTIN, OUTPUT);
 		buzzer_off();
 	}
 
@@ -27,7 +27,7 @@ public:
 		if (idle_blink) {
 			run_idle_blink();
 		} else {
-			digitalWrite(LED_BUILTIN, LOW);
+			//digitalWrite(LED_BUILTIN, LOW);
 		}
 	}
 
@@ -120,10 +120,10 @@ private:
 			noTone(buzzer_pin);
 		}
 
-		digitalWrite(
-			LED_BUILTIN,
-			current[step_index].led_enable ? HIGH : LOW
-		);
+		//digitalWrite(
+		//	LED_BUILTIN,
+		//	current[step_index].led_enable ? HIGH : LOW
+		//);
 	}
 
 	void run_idle_blink() {
@@ -131,12 +131,12 @@ private:
 		if (now - idle_led_ms >= idle_blink_period_ms) {
 			idle_led_ms = now;
 			idle_led_state = !idle_led_state;
-			digitalWrite(LED_BUILTIN, idle_led_state ? HIGH : LOW);
+			//digitalWrite(LED_BUILTIN, idle_led_state ? HIGH : LOW);
 		}
 	}
 
 	void buzzer_off() {
 		noTone(buzzer_pin);
-		digitalWrite(LED_BUILTIN, LOW);
+		//digitalWrite(LED_BUILTIN, LOW);
 	}
 };

@@ -1,8 +1,8 @@
-#define SETUP_MESSAGE "BLINKOMETER_V2@RP2040 (Valkor 2026-1-28)" 
+#define SETUP_MESSAGE "BLINKOMETER_V3@RP2350 (Valkor 2026-3-5)" 
 
 //TODO why batt percent only even numbers
 
-#define PIN_USB_DETECT 1
+#define PIN_USB_DETECT 0
 
 #define PIN_BUTTON 12
 #include "button.hpp"
@@ -14,10 +14,10 @@ Button button(PIN_BUTTON, 400);//ms for flicker counter reset
 Display oled(PIN_OLED_SDA, PIN_OLED_SCL);
 
 #include "nitsmeter.hpp"
-NitsMeter sensor1(26); //TODO use other sensor?
+NitsMeter sensor1(27); //TODO use other sensor?
 
 #include "buzzer.hpp"
-#define PIN_BUZZER 0
+#define PIN_BUZZER 2
 Buzzer buzzer(PIN_BUZZER);
 
 #include "voltmeter.hpp"
@@ -27,7 +27,7 @@ static uint32_t flicker_count = 0;
 static uint32_t last_stopwatch_ms = 0;
 static uint32_t stopwatch_seconds = 0;
 static uint32_t last_save_ms = 0;
-static constexpr uint32_t autosave_interval_ms = 600000; // 10 min
+static constexpr uint32_t autosave_interval_ms = 600000; // 10 min = 600000
 
 
 #include <EEPROM.h>
@@ -115,6 +115,7 @@ void loop() {
     }
     voltmeter.operate();
     if (button.operate() == BUTTON_HOLD){
+        Serial.println("click");
         if (flicker_count == 0){
             stopwatch_seconds = 0;
             last_stopwatch_ms = millis(); // reset timer reference 
@@ -151,6 +152,8 @@ void loop() {
     oled.set_minutes(minutes);
     oled.set_hours(hours);
     oled.set_USB(USB_connected);
+
+    Serial.println(voltmeter.get_string(PERCENTAGE));
     
     oled.update();
 
@@ -163,7 +166,7 @@ void loop() {
 
 void shutdown(){
     oled.battery_died();
-    digitalWrite(LED_BUILTIN, LOW);
+    //digitalWrite(LED_BUILTIN, LOW);
     noTone(PIN_BUZZER);
 
     save_data();

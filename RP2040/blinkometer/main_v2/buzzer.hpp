@@ -12,6 +12,7 @@ public:
 
 	// effect triggers
 	void effect_reset()   { start_sequence(seq_reset); }
+	void effect_reset2()   { start_sequence(seq_reset2); }
 	void effect_flicker() { start_sequence(seq_flicker); }
 	void effect_turnoff() { start_sequence(seq_turnoff); }
 	void effect_turnon()  { start_sequence(seq_turnon); }
@@ -40,8 +41,12 @@ private:
 
 	// effect data (top-level)
 	static constexpr step seq_reset[] = {
-		{ false, true,  100, 600 },
-		{ false, true,  200, 800 },
+		{ false, true,  80, 600 },
+		{ false, true,  160, 800 },
+	};
+	static constexpr step seq_reset2[] = {
+		{ false, true,  80, 640 },
+		{ false, true,  160, 800 },
 	};
 
 	static constexpr step seq_flicker[] = {
