@@ -8,7 +8,7 @@ static uint32_t stopwatch_seconds = 0;
 
 void setup() {
     Serial.begin(9600);
-    delay(3000);
+    //delay(3000);
     oled.begin();
 }
 

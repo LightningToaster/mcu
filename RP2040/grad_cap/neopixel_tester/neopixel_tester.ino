@@ -1,8 +1,6 @@
-#define PIN_LED_STRIP 15
-#define NUM_PIXELS 64
-#define PIN_BUTTON 0
-
-
+#define PIN_LED_STRIP 25
+#define NUM_PIXELS 1
+#define PIN_BUTTON 12
 
 #include "button.hpp"
 Button button(PIN_BUTTON);
@@ -12,10 +10,8 @@ Strip strip(PIN_LED_STRIP, NUM_PIXELS);
 
 void setup() {
 	Serial.begin(9600);
-	pinMode(LED_BUILTIN, OUTPUT);
-	digitalWrite(LED_BUILTIN, HIGH);
-
-	delay(5000);
+	//pinMode(LED_BUILTIN, OUTPUT);
+	//digitalWrite(LED_BUILTIN, HIGH);
 
 	strip.begin();
 }
@@ -26,11 +22,14 @@ void loop() {
 	uint8_t button_status = button.operate();
 	
 	if (button_status == BUTTON_CLICK){
+		Serial.println("click");
 		mode = (mode % 9) + 1;
 		strip.set_all(
 			COLORS[mode-1][0]/5,
 			COLORS[mode-1][1]/5,
 			COLORS[mode-1][2]/5
 		);
-	} 
+	}else{
+		Serial.println("no");
+	}
 }

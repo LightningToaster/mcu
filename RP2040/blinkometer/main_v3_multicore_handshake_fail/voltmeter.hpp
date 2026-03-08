@@ -49,7 +49,7 @@ public:
 
     const char* get_string(uint8_t format = 0) const {
         if (!is_ok()) {
-            snprintf(text_buf, sizeof(text_buf), "USB");
+            snprintf(text_buf, sizeof(text_buf), "");
             return text_buf;
         }
 

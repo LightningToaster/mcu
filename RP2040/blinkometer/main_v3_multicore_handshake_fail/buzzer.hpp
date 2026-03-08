@@ -1,20 +1,12 @@
 #include <Arduino.h>
 
-#include <Adafruit_NeoPixel.h>
-static Adafruit_NeoPixel status_led(1, 25, NEO_GRB + NEO_KHZ800);
-
 class Buzzer {
 public:
 	explicit Buzzer(uint8_t buzzer_pin)
-	: buzzer_pin(buzzer_pin){
+		: buzzer_pin(buzzer_pin)
+	{
 		pinMode(buzzer_pin, OUTPUT);
 		//pinMode(LED_BUILTIN, OUTPUT);
-
-		status_led.begin();
-		//status_led.setBrightness(255);
-		status_led.clear();
-		status_led.show();
-
 		buzzer_off();
 	}
 
@@ -132,12 +124,6 @@ private:
 		//	LED_BUILTIN,
 		//	current[step_index].led_enable ? HIGH : LOW
 		//);
-		if (current[step_index].led_enable) {
-			status_led.setPixelColor(0, status_led.Color(255, 0, 0)); // red
-		} else {
-			status_led.setPixelColor(0, 0);
-		}
-		status_led.show();
 	}
 
 	void run_idle_blink() {
@@ -146,19 +132,11 @@ private:
 			idle_led_ms = now;
 			idle_led_state = !idle_led_state;
 			//digitalWrite(LED_BUILTIN, idle_led_state ? HIGH : LOW);
-			if (idle_led_state) {
-				status_led.setPixelColor(0, status_led.Color(255, 10, 0));
-			} else {
-				status_led.setPixelColor(0, 0);
-			}
-			status_led.show();
 		}
 	}
 
 	void buzzer_off() {
 		noTone(buzzer_pin);
 		//digitalWrite(LED_BUILTIN, LOW);
-		status_led.setPixelColor(0, 0);
-		status_led.show();
 	}
 };

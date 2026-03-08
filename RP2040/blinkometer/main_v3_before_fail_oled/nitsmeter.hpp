@@ -57,7 +57,7 @@ private:
     unsigned long now = millis();
 
     // ignore detection if last flicker too recent
-    if (now - last_flicker_time < 500) return;
+    if (now - last_flicker_time < 250) return;
 
     if (avg > current && (avg - current) > MAGNITUDE_THRESHOLD) {
         if (flicker_start_ms == 0) {
