@@ -133,7 +133,7 @@ private:
 		//	current[step_index].led_enable ? HIGH : LOW
 		//);
 		if (current[step_index].led_enable) {
-			status_led.setPixelColor(0, status_led.Color(255, 0, 0)); // red
+			status_led.setPixelColor(0, status_led.Color(80, 0, 170));
 		} else {
 			status_led.setPixelColor(0, 0);
 		}
@@ -147,7 +147,7 @@ private:
 			idle_led_state = !idle_led_state;
 			//digitalWrite(LED_BUILTIN, idle_led_state ? HIGH : LOW);
 			if (idle_led_state) {
-				status_led.setPixelColor(0, status_led.Color(255, 10, 0));
+				status_led.setPixelColor(0, status_led.Color(240, 15, 0));
 			} else {
 				status_led.setPixelColor(0, 0);
 			}

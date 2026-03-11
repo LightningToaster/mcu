@@ -1,9 +1,10 @@
-#define FIRMWARE_VERSION "v1.0" //Valkor 2026-3-8
+#define FIRMWARE_VERSION "v1.1" //Valkor 2026-3-10
 
 #define PIN_BUTTON 12
 #define PIN_OLED_SDA 8
 #define PIN_OLED_SCL 9
-#define PIN_SENSOR_1 27
+#define PIN_SENSOR_1 26
+//#define PIN_SENSOR_2 27 //not used yet
 #define PIN_VOLTMETER 29
 #define PIN_BUZZER 2
 #define RESET_BUTTON_HOLD_MS 400
