@@ -1,134 +1,161 @@
-#define SETUP_MESSAGE "XDL@RP2040 (Valkor 2025-11-28)" 
-/*TODO
+//XDL firmware 2026-6-20 -valkor
+//TODO verify works without OLED
 
-bring in the data
-*/
-//#define DEBUG //if defined:serial output
-#define ARMED_WHEELS  //comment to disable wheels (ESCs will still arm but NOT spin)
-#define ARMED_SOLENOID //comment to disable solenoid (solenoid will NOT actuate)
+#define PIN_MENU 5
+#define PIN_SHALLOW	3
+#define PIN_DEEP 2
+#define PIN_TOUCH 4
+#define PIN_BUZZER 6 //passive, tone()
+#define PIN_UV 14
+#define PIN_IR_LED 15
+#define PIN_IR_SENSE 29
+#define PIN_BATTERY 27
 
-#define PIN_BUILTIN_LED 25
-#define PIN_TRIGGER 2
-#define PIN_TRIGGER_B 1
-#define PIN_TRIGGER_REV 3
-#define PIN_SWITCH 14
-#define PIN_VOLTMETER 29
-#define PIN_DART_DETECTOR 28
-#define PIN_ESC_0 12 //controls left motor
-#define PIN_ESC_1 13 //controls right motor
-#define PIN_SOLENOID 11
-#define PIN_OLED_SDA 8
-#define PIN_OLED_SCL 9
+#define PIN_SDA 0
+#define PIN_SCL 1
 
-#include "step_button.hpp"
-StepButton trigger_main(PIN_TRIGGER, PIN_TRIGGER_B);
-StepButton trigger_rev(PIN_TRIGGER_REV);
+#include <Arduino.h>
+#include "core1_i2c.hpp"
+#include <Adafruit_NeoPixel.h>
+Adafruit_NeoPixel strip(1, 25, NEO_GRB + NEO_KHZ800);
 
-#include "switch.hpp"
-Switch slide_switch(PIN_SWITCH);
+#include "trigger.hpp"
+Trigger trigger(PIN_MENU, PIN_TOUCH, PIN_SHALLOW, PIN_DEEP);
 
-#include "voltmeter.hpp"
-Voltmeter voltmeter(PIN_VOLTMETER);
+bool oled_connected = false; // not used yet
 
-#include "dart_detector.hpp"
-DartDetector dart_detector(PIN_DART_DETECTOR);
 
-#include "wheels.hpp"
-Wheels wheels(PIN_ESC_0, PIN_ESC_1);
 
-#include "solenoid.hpp"
-Solenoid solenoid(PIN_SOLENOID);
+Core1I2C core; //TODO rename core1?
 
-#include "oled.hpp"
-OledDisplay oled(PIN_OLED_SDA, PIN_OLED_SCL);
-
-bool oled_connected;
+uint32_t t0 = 0;//testing, remove later
+uint8_t state = 0;//testing, remove later
 
 void setup() {
-  Serial.begin(9600);
-  oled_connected = oled.begin();
-  if (oled_connected){
-    oled.display_logo(0);
-  }
-  delay(1000);
-}//setup
+    Serial.begin(115200);
+    delay(1000);
+
+    core.begin(PIN_SDA, PIN_SCL);
+
+    // start on logo
+    core.display_mode = display_logo;
+}
+
+BUTTON_STATE last_result = TRIGGER_TOUCH;
 
 void loop() {
-  bool voltage_ok = voltmeter.operate();
-  bool wheels_revd = wheels.operate();
-  bool dart_was_fired = solenoid.operate(wheels_revd);
-  int8_t dart_status = dart_detector.operate();
-  int8_t status_switch = slide_switch.operate();
-  int8_t status_trigger_main = trigger_main.operate();
-  int8_t status_trigger_rev = trigger_rev.operate();
+    //uint32_t now = millis();
+    BUTTON_STATE result = trigger.operate();
+    if (result != last_result){
+        Serial.print("T=");
+        Serial.println(result);
+        last_result = result;
+    }
 
-  static uint16_t darts_fired_mag = 0;
-  static uint32_t darts_fired_session = 0;
+//   if (result != BUTTON_IDLE) {
+
+//     Serial.print("button_state = ");
+
+//     switch (result) {
+
+//       case BUTTON_TOUCH:
+//         Serial.println("BUTTON_TOUCH");
+//         break;
+
+//       case BUTTON_TAP:
+//         Serial.println("BUTTON_TAP");
+//         break;
+
+//       case BUTTON_SHALLOW_CLICK:
+//         Serial.println("BUTTON_SHALLOW_CLICK");
+//         break;
+
+//       case BUTTON_SHALLOW_HOLD:
+//         Serial.println("BUTTON_SHALLOW_HOLD");
+//         break;
+
+//       case BUTTON_DEEP_CLICK:
+//         Serial.println("BUTTON_DEEP_CLICK");
+//         break;
+
+//       case BUTTON_DEEP_HOLD:
+//         Serial.println("BUTTON_DEEP_HOLD");
+//         break;
+
+//       default:
+//         Serial.println("UNKNOWN");
+//         break;
+//     }
   
 
-  if (dart_was_fired){
-     darts_fired_mag++;
-     darts_fired_session++;
-     //TODO increment all time shot counter
-  }
- 
-  if (status_switch == SWITCH_IS_OPENED and false){//TODO after menu added, make sure oled connected
-    //TODO menu
-    solenoid.stop();
-    wheels.stop();
-    oled.display_menu();
+  //delay(20);
+}
+    
 
-  }else{//fire mode
-  
-    if (voltage_ok){
-      if (dart_status == DART_READY){
-        if (status_trigger_rev == BUTTON_HOLD
-        ||status_trigger_main == BUTTON_HOLD
-        ||status_trigger_main == BUTTON_DEEP_HOLD
-        ||digitalRead(6) == LOW)//TEMP for capacitive
-        {
-          if (oled_connected and false){//TODO after menu added
-            //wheels.set_throttle_percentage(35);//TODO use data
-          }else{//no OLED, use switch for 2 FPS settings
-            if (status_switch == SWITCH_IS_CLOSED){
-              wheels.set_throttle_percentage(64);//high FPS //63
-            }else{
-              wheels.set_throttle_percentage(30);//low FPS
-            }
-          }
-          
-        }else{
-          wheels.idle();
+/*
+    // cycle screens every 2 seconds
+    if (now - t0 > 2000) {
+        t0 = now;
+
+        state++;
+
+        switch (state) {
+            case 0:
+                core.display_mode = display_logo;
+                break;
+
+            case 1:
+                core.display_mode = display_ammo;
+                core.ammo = 3;
+                break;
+
+            case 2:
+                core.ammo = 25;
+                break;
+
+            case 3:
+                core.ammo = 9000;
+                break;
+
+            case 4:
+                core.display_mode = display_empty;
+                snprintf(core.voltage, sizeof(core.voltage), "15.2V");
+                core.fired = 17;
+                break;
+
+            case 5:
+                core.display_mode = display_battery;
+                core.battery_state = battery_disconnected;
+                snprintf(core.voltage, sizeof(core.voltage), "0.0V");
+                break;
+
+            case 6:
+                core.battery_state = battery_low;
+                snprintf(core.voltage, sizeof(core.voltage), "14.1V");
+                break;
+
+            case 7:
+                core.battery_state = battery_good;
+                snprintf(core.voltage, sizeof(core.voltage), "16.4V");
+                break;
+
+            case 8:
+                core.battery_state = battery_overcharged;
+                snprintf(core.voltage, sizeof(core.voltage), "17.8V");
+                break;
+
+            case 9:
+                state = 0;
+                core.settings.launched++;
+                core.request_save();
+                break;
         }
+    }
 
-        if (status_trigger_main == BUTTON_CLICK
-        || status_trigger_main == BUTTON_DEEP_HOLD)
-        {
-          solenoid.fire(1);//TODO data volley
-        }
-        oled.display_ammo(darts_fired_mag, darts_fired_session);
+    // simulate ammo change continuously
+    if (core.display_mode == display_ammo) {
+        core.ammo--;
+        if (core.ammo > 1000) core.ammo = 1000;
+    }*/
 
-      }else if (dart_status == MAG_EMPTY){
-        solenoid.stop();
-        wheels.stop();
-        oled.display_empty(voltmeter.get_string(CELL));
-
-      }else if (dart_status == NEW_MAG){
-        darts_fired_mag = 0;
-
-      }else if (dart_status == DART_NONE){
-        wheels.set_throttle_percentage(0);
-        solenoid.stop();
-      }//dart_status?
-        
-      
-    }else{//voltage_ok?
-      solenoid.stop();
-      wheels.set_throttle_percentage(0);
-      oled.display_battery(voltmeter.get_status(), 
-          voltmeter.get_string(CELL) + "   " + voltmeter.get_string(PACK) + "   " + voltmeter.get_string(PERCENTAGE));
-    }//voltage_ok?
-
-  }
-
-}//loop
+    //delay(50);

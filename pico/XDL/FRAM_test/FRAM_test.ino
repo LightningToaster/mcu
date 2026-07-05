@@ -39,7 +39,7 @@ void setup() {
     }
 
     if (!found) {
-        Serial.println("fm24cl16b not found");
+        Serial.println("FM24CL16B not found");
         return;
     }
 

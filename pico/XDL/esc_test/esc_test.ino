@@ -2,7 +2,7 @@
 //signal goes through level shifters then to escs
 
 #define PIN_TOUCH		4
-#define PIN_SHALLOW			3
+#define PIN_SHALLOW	3
 #define PIN_UV 14
 
 #define THROTTLE_ARM 1010 // below for reliability

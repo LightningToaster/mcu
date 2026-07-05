@@ -1,5 +1,3 @@
-//usage oled->drawBitmap(logos[0].x, logos[0].y, logos[0].bitmap, logos[0].width, logos[0].height, SH110X_WHITE);
-
 // 'LightningToaster_logo_70x64', 70x64px
 const unsigned char epd_bitmap_LightningToaster_logo [] PROGMEM = {
 	0x00, 0x00, 0x00, 0x00, 0x07, 0xfc, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x3c, 0x0f, 0x80, 
@@ -52,5 +50,5 @@ struct logo_t {
 };
 // --- declare logos here ---
 const logo_t logos[]{
-  {epd_bitmap_LightningToaster_logo, 70, 64, 29, 0},
+  {epd_bitmap_LightningToaster_logo, 70, 64, 0, 0},
 };
