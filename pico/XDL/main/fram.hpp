@@ -1,8 +1,5 @@
 #pragma once
 
-#include <Arduino.h>
-#include <Wire.h>
-
 class Fram {
 public:
     static constexpr uint8_t base_addr = 0x50;

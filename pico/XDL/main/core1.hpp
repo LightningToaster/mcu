@@ -1,41 +1,38 @@
 #pragma once
 
-#include <Arduino.h>
 #include <Wire.h>
 #include "pico/multicore.h"
 
-
-// --------------------
-// settings (ONLY copy)
-// --------------------
-
 struct settings_t {
     uint8_t profile;
-
-    uint8_t power1;
-    uint8_t power2;
-    uint8_t power3;
 
     uint8_t volley1;
     uint8_t volley2;
     uint8_t volley3;
 
+    uint8_t power1;
+    uint8_t power2;
+    uint8_t power3;
+
     uint8_t dart_detection1;
     uint8_t dart_detection2;
     uint8_t dart_detection3;
 
-    uint8_t uv1;
-    uint8_t uv2;
-    uint8_t uv3;
+    uint8_t glow1;
+    uint8_t glow2;
+    uint8_t glow3;
 
+    uint8_t failed_logins;
     uint32_t minutes;
     uint32_t launched;
 };
 
-// --------------------
-
-enum display_mode : uint8_t {
-    display_logo = 0,
+enum display_mode : uint8_t {//might not need all these
+    display_splash = 0,
+    display_lock,
+    display_logo,
+    display_info,
+    display_menu,
     display_ammo,
     display_empty,
     display_battery,
@@ -48,19 +45,26 @@ enum battery_state : uint8_t {
     battery_overcharged,
 };
 
+
+
 #include "fram.hpp"
 #include "oled.hpp"
 
-class Core1I2C {
+class Core1 {
 public:
     Fram fram;
     Oled oled;
 
     Adafruit_SH1106G display_driver{128, 64, &Wire, -1};
 
+    volatile uint8_t selected_char = 0;
+    char pin_entered[PIN_LENGTH + 1];//extra for null char
+
     volatile uint8_t display_mode = 0;
+    volatile uint8_t selection = 2;
     volatile uint16_t ammo = 0;
     volatile uint16_t fired = 0;
+    volatile uint16_t darts_session = 0;
     volatile uint8_t battery_state = 0;
 
     char voltage[8] = {0};
@@ -69,7 +73,7 @@ public:
 
     bool settings_dirty = false;
 
-    static Core1I2C* instance;
+    static Core1* instance;
 
     bool begin(uint8_t sda, uint8_t scl, uint8_t addr = 0x3C) {
         Wire.setSDA(sda);
@@ -96,6 +100,14 @@ public:
         settings_dirty = true;
     }
 
+    void randomize_starting_pin() {
+        for (uint8_t i = 0; i < PIN_LENGTH; i++) {
+            pin_entered[i] = '0' + random(10);
+        }
+
+        pin_entered[PIN_LENGTH] = '\0';
+    }
+
 private:
     unsigned long last_frame = 0;
     static constexpr uint32_t frame_ms = 33;
@@ -120,7 +132,11 @@ private:
             oled.clear();
 
             switch (display_mode) {
+                case display_splash: oled.draw_splash(); break;
+                case display_lock: oled.draw_lock(selected_char, pin_entered); break;
                 case display_logo: oled.draw_logo(); break;
+                case display_info: oled.draw_info(settings.minutes, settings.launched, voltage); break;
+                case display_menu: oled.draw_menu(settings, selection, darts_session); break;
                 case display_ammo: oled.draw_ammo(ammo); break;
                 case display_empty: oled.draw_empty(voltage, fired); break;
                 case display_battery: oled.draw_battery(battery_state, voltage); break;
@@ -143,24 +159,25 @@ private:
     };
 
     void load_defaults() {
-        settings.profile = 0;
+        settings.profile = 1;
+
+        settings.volley1 = 0;
+        settings.volley2 = 2;
+        settings.volley3 = 3;
 
         settings.power1 = 10;
         settings.power2 = 20;
         settings.power3 = 30;
 
-        settings.volley1 = 1;
-        settings.volley2 = 2;
-        settings.volley3 = 4;
-
         settings.dart_detection1 = 1;
         settings.dart_detection2 = 1;
         settings.dart_detection3 = 1;
 
-        settings.uv1 = 0;
-        settings.uv2 = 1;
-        settings.uv3 = 2;
+        settings.glow1 = 1;//low
+        settings.glow2 = 2;//med
+        settings.glow3 = 3;//high
 
+        settings.failed_logins = 0;
         settings.minutes = 0;
         settings.launched = 0;
     }
@@ -169,7 +186,7 @@ private:
         fram_header_t hdr;
         fram.read(0, &hdr, sizeof(hdr));
 
-        if (hdr.magic != settings_magic || hdr.version != settings_version) {
+        if (hdr.magic != settings_magic || hdr.version != settings_version || RESET_SAVE == true) {
             load_defaults();
             save_settings();
             return;
@@ -186,6 +203,8 @@ private:
         fram.write(0, &hdr, sizeof(hdr));
         fram.write(sizeof(fram_header_t), &settings, sizeof(settings));
     }
+
+    
 };
 
-Core1I2C* Core1I2C::instance = nullptr;
+Core1* Core1::instance = nullptr;

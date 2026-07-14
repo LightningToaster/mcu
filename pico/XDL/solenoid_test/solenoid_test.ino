@@ -1,5 +1,8 @@
 //send a number through serial and the solenoid will pulse that many times
+//send "on 70" to set on pulse to 70ms
+//send "off 20" to set off to 70ms
 #define SOLENOID_PIN 7
+#define PIN_UV 14
 
 #include <Adafruit_NeoPixel.h>
 Adafruit_NeoPixel strip(1, 25, NEO_GRB + NEO_KHZ800);
@@ -10,6 +13,7 @@ uint8_t off_ms = 70;
 void setup() {
   Serial.begin(9600);
   strip.begin();
+  analogWrite(PIN_UV, 0);//TEMP so it stop blinking
 
   while (!Serial && millis() < 200) {}
 

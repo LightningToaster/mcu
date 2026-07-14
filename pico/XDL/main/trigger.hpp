@@ -1,7 +1,7 @@
 #pragma once
 //valkor 2026-7-5
 //XDL custom 3 stage trigger with menu switch 
-enum BUTTON_STATE : uint8_t {
+enum TRIGGER_STATE : uint8_t {
   TRIGGER_IDLE = 0,
   TRIGGER_TOUCH,
   TRIGGER_TAP,
@@ -15,7 +15,7 @@ enum BUTTON_STATE : uint8_t {
 #define SHALLOW_CLICK_MIN_MILLISECONDS 25
 #define DEEP_CLICK_MIN_MILLISECONDS 25
 #define DEEP_CLICK_MAX_MILLISECONDS 100
-#define DEEP_HOLD_MILLISECONDS 100
+#define DEEP_HOLD_MILLISECONDS 200
 
 class Trigger {
 private:
@@ -58,11 +58,11 @@ public:
 
   }
 
-  BUTTON_STATE operate() {
+  TRIGGER_STATE operate(bool locked = false) {
     unsigned long us = micros();
     unsigned long ms = millis();
     if (ms < 1000) return TRIGGER_IDLE;//trigger state invalid on power on
-    menu_mode = !digitalRead(pin_menu);
+    menu_mode = !digitalRead(pin_menu) or locked;//force menu controls if locked
 
     uint8_t deep = !digitalRead(pin_deep);
     if (deep == true){
@@ -80,11 +80,13 @@ public:
             if (debounce_deep == false){
               debounce_deep = true;
               ms_deep = 0;
+              debounce_shallow = false;
               return TRIGGER_DEEP_CLICK;
             }
             
           }else if (ms - ms_deep >= DEEP_HOLD_MILLISECONDS){
             ms_deep = ms;
+            debounce_shallow = false;
             return TRIGGER_DEEP_CLICK;
           }
           
@@ -110,18 +112,23 @@ public:
         }
       }else{//menu
         ignore_next_tap = true;
-        if (ignore_shallow == false && ms - ms_shallow >= SHALLOW_CLICK_MIN_MILLISECONDS){          
+        if (debounce_shallow == false && ignore_shallow == false && ms - ms_shallow >= SHALLOW_CLICK_MIN_MILLISECONDS){          
           debounce_shallow = true;
-          return TRIGGER_SHALLOW_CLICK;
+          //return TRIGGER_SHALLOW_CLICK;
         }else{
           return TRIGGER_IDLE;
         }
       }
       
     }else{
-      debounce_shallow = false;
       ignore_shallow = false;
       ms_shallow = 0;
+      if (debounce_shallow == true){
+        debounce_shallow = false;
+        return TRIGGER_SHALLOW_CLICK;
+      }
+      
+      
     }
 
     
@@ -146,6 +153,7 @@ public:
       us_touch = 0;
 
     }
+    ignore_next_tap = false; //make sure this doesnt break everything!
     return TRIGGER_IDLE;    
   }//operate
 

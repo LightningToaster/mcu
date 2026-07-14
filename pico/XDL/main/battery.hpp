@@ -11,7 +11,7 @@ enum BATTERY_STATUS : uint8_t {
   BATTERY_OVERCHARGED, // 3
 };
 
-class Voltmeter {
+class Battery {
 private:
     static constexpr float VOLTAGE_MIN_4S = 14.0;
     static constexpr float VOLTAGE_MAX_4S = 16.8;
@@ -31,7 +31,7 @@ private:
     float cached_voltage = 0.0;
 
 public:
-    Voltmeter(uint8_t pin) : pin(pin) {
+    Battery(uint8_t pin) : pin(pin) {
         pinMode(pin, INPUT);
     }
 
@@ -45,28 +45,44 @@ public:
         return is_ok();
     }
 
-    String get_string(uint8_t format = 0) const {
-        if (!is_ok()) return "0v";
-        float output = cached_voltage;
-        switch(format){
-            case CELL: 
-            output /= NUM_CELLS;
-            return String(output, 2) + "v";
+    void get_string(char* buffer, size_t length, uint8_t format = PACK) const {
+        if (length == 0) return;
+
+        if (!is_ok()) {
+            snprintf(buffer, length, "0V");
+            return;
+        }
+
+        switch (format) {
+
+            case CELL:
+                snprintf(buffer, length, "%.2fV", cached_voltage / NUM_CELLS);
+                break;
 
             case PACK:
-            return String(output, 1) + "v";
+                snprintf(buffer, length, "%.1fV", cached_voltage);
+                break;
 
-            case PERCENTAGE:
-            int32_t v = (int32_t)(output * 100.0f);
-            const int32_t VMIN = (int32_t)(VOLTAGE_MIN_4S * 100);
-            const int32_t VMAX = (int32_t)(VOLTAGE_MAX_4S * 100);
-            if (v < VMIN) v = VMIN;
-            if (v > VMAX) v = VMAX;
-            v = (int)((v - VMIN) * 100 / (VMAX - VMIN));
-            return String(v) + "%";
+            case PERCENTAGE: {
+                int32_t v = (int32_t)(cached_voltage * 100.0f);
+
+                const int32_t v_min = (int32_t)(VOLTAGE_MIN_4S * 100.0f);
+                const int32_t v_max = (int32_t)(VOLTAGE_MAX_4S * 100.0f);
+
+                if (v < v_min) v = v_min;
+                if (v > v_max) v = v_max;
+
+                int percent = ((v - v_min) * 100) / (v_max - v_min);
+
+                snprintf(buffer, length, "%d%%", percent);
+                break;
+            }
+
+            default:
+                snprintf(buffer, length, "?");
+                break;
         }
-        return "?";
-    }
+    }//get_string
 
     BATTERY_STATUS get_status() const {
         if (cached_voltage < 1.0) return BATTERY_DISCONNECTED;
@@ -94,4 +110,4 @@ private:
     static float fmap(float x, float in_min, float in_max, float out_min, float out_max) {
         return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
     }
-};
+};//Battery
