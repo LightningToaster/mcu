@@ -1,77 +1,138 @@
+//valkor
 enum DART_STATE : uint8_t {
-	DART_NONE = 0,   // no dart detected
-	DART_READY,      // dart detected and stable
-	MAG_EMPTY,       // one-shot pulse when mag goes empty
-	NEW_MAG          // one-shot pulse when new mag inserted
+  DART_NONE = 0,  // no dart detected
+  DART_READY,     // dart detected and stable
+  MAG_EMPTY,      // one-shot pulse when mag goes empty
+  NEW_MAG         // one-shot pulse when new mag inserted
 };
 
 class DartDetector {
 public:
-	explicit DartDetector(uint8_t pin)
-		: pin(pin), ms_none(0), ms_dart(0),
-		  last_state(DART_NONE), pulse_pending(DART_NONE) {
-		pinMode(pin, INPUT);
-	}
+  explicit DartDetector(uint8_t emitter_pin, uint8_t receiver_pin)
+    : emitter_pin(emitter_pin), receiver_pin(receiver_pin) {
+    pinMode(emitter_pin, OUTPUT);
+    digitalWrite(emitter_pin, LOW);
+  }
 
-	DART_STATE operate() {
-		unsigned long now = millis();
-		int16_t value = analogRead(pin);
+  DART_STATE operate() {
 
-		// handle one-shot pulse first if queued
-		if (pulse_pending != DART_NONE) {
-			DART_STATE p = pulse_pending;
-			pulse_pending = DART_NONE;
-			return p;
-		}
+    // perform one step of the non-blocking sampler
+    sample();
 
-		// dart present
-		if (value >= THRESHOLD) {
-			if (last_state != DART_READY) {
-				// transition: no dart -> dart
-				if (mag_empty_sent) {
-					// we had an empty mag, now we see new dart
-					pulse_pending = NEW_MAG;
-					mag_empty_sent = false;
-					last_state = DART_READY;
-					return DART_READY; // still return ready in same cycle
-				}
-			}
-			// require dart stable for DART_LOAD_MS
-			if (now - ms_none >= DART_LOAD_MS) {
-				last_state = DART_READY;
-			}
-			ms_dart = now;
-		} 
-		// no dart
-		else {
-			if (last_state == DART_READY) {
-				// record first time we saw none
-				ms_none = now;
-			}
+    uint32_t now = millis();
 
-			if (now - ms_none >= MIN_MAG_CHANGE_MS && !mag_empty_sent) {
-				// been empty long enough → one-shot MAG_EMPTY
-				pulse_pending = MAG_EMPTY;
-				mag_empty_sent = true;
-				last_state = DART_NONE;
-				return MAG_EMPTY;
-			}
+    if (reflection > threshold) {
 
-			last_state = DART_NONE;
-		}
+      no_dart_timer = now;
 
-		return last_state;
-	}
+      if (mag_empty) {
+        mag_empty = false;
+        return NEW_MAG;
+      }
+
+      return DART_READY;
+    }
+
+    // no dart detected
+    if (!mag_empty && (now - no_dart_timer >= mag_empty_delay_ms)) {
+      mag_empty = true;
+      return MAG_EMPTY;
+    }
+
+    return DART_NONE;
+  }
+
+  int get_reflection() const {
+    return reflection;
+  }
 
 private:
-	static constexpr int16_t THRESHOLD = 55; // analog threshold
-	static constexpr int16_t DART_LOAD_MS = 1;
-	static constexpr int16_t MIN_MAG_CHANGE_MS = 50;
 
-	uint8_t pin;
-	unsigned long ms_none;
-	unsigned long ms_dart;
-	DART_STATE last_state;
-	DART_STATE pulse_pending;
-	bool mag_empty_sent = false;
+  void sample() {
+
+    switch (sample_state) {
+
+      case SAMPLE_AMBIENT_START:
+        digitalWrite(emitter_pin, LOW);
+        sample_timer = micros();
+        sample_state = SAMPLE_AMBIENT_READ;
+        break;
+
+      case SAMPLE_AMBIENT_READ:
+        if (micros() - sample_timer >= settle_time_us) {
+
+          ambient_sum += analogRead(receiver_pin);
+
+          if (++ambient_samples >= sample_count) {
+
+            ambient = ambient_sum / sample_count;
+            ambient_sum = 0;
+            ambient_samples = 0;
+
+            digitalWrite(emitter_pin, HIGH);
+            sample_timer = micros();
+            sample_state = SAMPLE_ACTIVE_READ;
+
+          } else {
+            sample_state = SAMPLE_AMBIENT_START;
+          }
+        }
+        break;
+
+      case SAMPLE_ACTIVE_READ:
+        if (micros() - sample_timer >= settle_time_us) {
+
+          active_sum += analogRead(receiver_pin);
+
+          if (++active_samples >= sample_count) {
+
+            digitalWrite(emitter_pin, LOW);
+
+            active = active_sum / sample_count;
+            active_sum = 0;
+            active_samples = 0;
+
+            reflection = active - ambient;
+
+            sample_state = SAMPLE_AMBIENT_START;
+
+          } else {
+            digitalWrite(emitter_pin, LOW);
+            sample_state = SAMPLE_AMBIENT_START;
+          }
+        }
+        break;
+    }
+  }
+
+  enum SAMPLE_STATE : uint8_t {
+    SAMPLE_AMBIENT_START,
+    SAMPLE_AMBIENT_READ,
+    SAMPLE_ACTIVE_READ
+  };
+
+  uint8_t emitter_pin;
+  uint8_t receiver_pin;
+
+  SAMPLE_STATE sample_state = SAMPLE_AMBIENT_START;
+
+  uint32_t sample_timer = 0;
+  uint32_t no_dart_timer = 0;
+
+  uint32_t ambient_sum = 0;
+  uint32_t active_sum = 0;
+
+  uint8_t ambient_samples = 0;
+  uint8_t active_samples = 0;
+
+  int ambient = 0;
+  int active = 0;
+  int reflection = 0;
+
+  bool mag_empty = false;
+
+  static constexpr uint16_t settle_time_us = 200;
+  static constexpr uint8_t sample_count = 8;
+  static constexpr int threshold = 10;
+  static constexpr uint16_t mag_empty_delay_ms = 250;
 };

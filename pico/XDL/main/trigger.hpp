@@ -1,163 +1,174 @@
-#pragma once
-//valkor 2026-7-5
-//XDL custom 3 stage trigger with menu switch 
+//valkor 2026-7-16
+//XDL custom 3 stage trigger
+
+
 enum TRIGGER_STATE : uint8_t {
   TRIGGER_IDLE = 0,
-  TRIGGER_TOUCH,
-  TRIGGER_TAP,
-  TRIGGER_SHALLOW_CLICK,
-  TRIGGER_DEEP_CLICK,
+  TRIGGER_TOUCH_START, //1
+  TRIGGER_TOUCH_ONGOING,//2
+  TRIGGER_TOUCH_END,//3
+  TRIGGER_SHALLOW_START,//4
+  TRIGGER_SHALLOW_ONGOING,//5
+  TRIGGER_SHALLOW_END,//6
+  TRIGGER_SHALLOW_INCREMENT,
+  TRIGGER_DEEP_START,
+  TRIGGER_DEEP_ONGOING,
+  TRIGGER_DEEP_END,
+  TRIGGER_DEEP_INCREMENT,
 };
-
-#define TOUCH_MIN_MICROSECONDS 1000 //filters out false positives
-#define TOUCH_TAP_MIN_MILLISECONDS 25
-#define TOUCH_TAP_MAX_MILLISECONDS 250
-#define SHALLOW_CLICK_MIN_MILLISECONDS 25
-#define DEEP_CLICK_MIN_MILLISECONDS 25
-#define DEEP_CLICK_MAX_MILLISECONDS 100
-#define DEEP_HOLD_MILLISECONDS 200
 
 class Trigger {
 private:
 
-  uint8_t pin_menu;
+  const uint8_t TOUCH_START_MS = 2;  //has to be at least 2
+  const uint8_t TOUCH_END_MS = 50;   //must be down for this long to register an end
+  const uint8_t TOUCH_END_MAX_MS = 150;
+  const uint8_t SHALLOW_START_MS = 3;
+  const uint8_t SHALLOW_END_MS = 20;          //must be down for this long to register an end
+  const uint16_t SHALLOW_INCREMENT_MS = 250;  //for example, wait 250ms then return, and repeat
+  const uint8_t DEEP_START_MS = 8;
+  const uint8_t DEEP_END_MS = 20;          //must be down for this long to register an end
+  const uint16_t DEEP_INCREMENT_MS = 500;  //for example, wait 250ms then return, and repeat
+  const uint8_t DEBOUNCE_MS = 20;       
+
   uint8_t pin_touch;
   uint8_t pin_shallow;
   uint8_t pin_deep;
 
-  bool menu_mode = false;
-
-  unsigned long us_touch = 0;
+  unsigned long ms_touch = 0;
   unsigned long ms_shallow = 0;
   unsigned long ms_deep = 0;
-
-  bool debounce_shallow = false;
-  bool debounce_deep = false;
-  bool ignore_next_tap = false;
-  bool ignore_shallow = false;
-
+  unsigned long ms_debounce = 0;
+  bool touch_started = false;
+  bool shallow_started = false;
+  bool deep_started = false;
+  bool ignore_next_touch = false;
+  bool ignore_next_shallow = false;
 
 public:
-
   Trigger(
-    uint8_t pin_menu,
     uint8_t pin_touch,
     uint8_t pin_shallow,
-    uint8_t pin_deep
-  ):
-    pin_menu(pin_menu),
-    pin_touch(pin_touch),
-    pin_shallow(pin_shallow),
-    pin_deep(pin_deep)
-  {
-    
-    pinMode(pin_menu, INPUT_PULLUP);
+    uint8_t pin_deep)
+    : pin_touch(pin_touch),
+      pin_shallow(pin_shallow),
+      pin_deep(pin_deep) {
     pinMode(pin_touch, INPUT_PULLUP);
     pinMode(pin_shallow, INPUT_PULLUP);
     pinMode(pin_deep, INPUT_PULLUP);
+  }  //Trigger
 
-  }
-
-  TRIGGER_STATE operate(bool locked = false) {
-    unsigned long us = micros();
+  TRIGGER_STATE operate() {
     unsigned long ms = millis();
-    if (ms < 1000) return TRIGGER_IDLE;//trigger state invalid on power on
-    menu_mode = !digitalRead(pin_menu) or locked;//force menu controls if locked
+    if (ms < 1000) return TRIGGER_IDLE;  //trigger state invalid on power on
 
-    uint8_t deep = !digitalRead(pin_deep);
-    if (deep == true){
-      if (ms_deep == 0){//if not start recorded
-        ms_deep = ms;//record start
-      }else if (menu_mode == false){
-        if (ms - ms_deep >= 1){    
-           return TRIGGER_DEEP_CLICK;
-        }
-      }else{//menu
-        ignore_next_tap = true;
-        ignore_shallow = true;
-        if (ms - ms_deep >= DEEP_CLICK_MIN_MILLISECONDS){
-          if (ms - ms_deep <= DEEP_CLICK_MAX_MILLISECONDS){
-            if (debounce_deep == false){
-              debounce_deep = true;
-              ms_deep = 0;
-              debounce_shallow = false;
-              return TRIGGER_DEEP_CLICK;
-            }
-            
-          }else if (ms - ms_deep >= DEEP_HOLD_MILLISECONDS){
-            ms_deep = ms;
-            debounce_shallow = false;
-            return TRIGGER_DEEP_CLICK;
-          }
-          
-        }else{
+    bool deep = !digitalRead(pin_deep);
+    if (deep == true) {
+      if (ms_deep == 0) {
+        ms_deep = ms;
+      } else if (ms - ms_deep >= DEEP_INCREMENT_MS) {
+        ms_deep = ms;
+        return TRIGGER_DEEP_INCREMENT;
+      } else if (ms - ms_deep >= DEEP_START_MS) {
+        ignore_next_shallow = true;
+        if (deep_started == true) {
+          return TRIGGER_DEEP_ONGOING;
+        } else if (ms - ms_debounce >= DEBOUNCE_MS){
+          deep_started = true;
+          ms_debounce = ms;
+          return TRIGGER_DEEP_START;
+        }else{//too soon, ignored
+          ms_deep = 0;
           return TRIGGER_IDLE;
         }
       }
-      
-    }else{
-      debounce_deep = false;
-      ms_deep = 0;
-    }
+    } else {
+      if (ms - ms_deep >= DEEP_START_MS
+      and ms - ms_deep >= DEBOUNCE_MS
+      and deep_started == true) {  //deep end
+        deep_started = false;
+        ms_deep = 0;
+        ms_debounce = ms;
+        return TRIGGER_DEEP_END;
+      }else{
+        deep_started = false;
+        ms_deep = 0;
+      }
+    }  //deep?
 
-
-    uint8_t shallow = !digitalRead(pin_shallow);
-    if (shallow == true){
-      if (ms_shallow == 0){//if not start recorded
-        ms_shallow = ms;//record start
-      }else if (menu_mode == false){
-        if (debounce_shallow == false && ms - ms_shallow >= 1){          
-          debounce_shallow = true;
-          return TRIGGER_SHALLOW_CLICK;
-        }
-      }else{//menu
-        ignore_next_tap = true;
-        if (debounce_shallow == false && ignore_shallow == false && ms - ms_shallow >= SHALLOW_CLICK_MIN_MILLISECONDS){          
-          debounce_shallow = true;
-          //return TRIGGER_SHALLOW_CLICK;
-        }else{
+    bool shallow = !digitalRead(pin_shallow);
+    if (shallow == true) {
+      if (ms_shallow == 0) {
+        ms_shallow = ms;
+      } else if (ms - ms_shallow >= SHALLOW_INCREMENT_MS) {
+        ms_shallow = ms;
+        ignore_next_shallow = true;
+        ms_debounce = ms;
+        return TRIGGER_SHALLOW_INCREMENT;
+      } else if (ms - ms_shallow >= SHALLOW_START_MS) {
+        ignore_next_touch = true;
+        if (shallow_started == true) {
+          return TRIGGER_SHALLOW_ONGOING;
+        } else if (ms - ms_debounce >= DEBOUNCE_MS){
+          shallow_started = true;
+          ms_debounce = ms;
+          return TRIGGER_SHALLOW_START;
+        }else{//too soon, ignored
+          ms_shallow = 0;
           return TRIGGER_IDLE;
         }
       }
-      
-    }else{
-      ignore_shallow = false;
-      ms_shallow = 0;
-      if (debounce_shallow == true){
-        debounce_shallow = false;
-        return TRIGGER_SHALLOW_CLICK;
-      }
-      
-      
-    }
-
-    
-    uint8_t touch = digitalRead(pin_touch);
-    if (touch == true){//is touching
-      if (us_touch == 0){//if not touch start recorded
-        us_touch = us;//record touch start
-      }else if (menu_mode == false && us - us_touch >= TOUCH_MIN_MICROSECONDS){// >=1ms of touch = report
-        return TRIGGER_TOUCH; 
-      }
-    }else{//if no touch, reset timer
-      unsigned long ms_touch_dif = ms - us_touch/1000;
-      if(menu_mode == true && ms_touch_dif >= TOUCH_TAP_MIN_MILLISECONDS && ms_touch_dif <= TOUCH_TAP_MAX_MILLISECONDS){
-        us_touch = 0;
-        if (ignore_next_tap == false){
-          return TRIGGER_TAP; 
-        }else{
-          ignore_next_tap = false; 
+    } else {
+      if (ms - ms_shallow >= SHALLOW_END_MS
+      and ms - ms_debounce >= DEBOUNCE_MS
+      and shallow_started == true) {  //shallow end
+        shallow_started = false;
+        ms_shallow = 0;
+        ms_debounce = ms;
+        if (ignore_next_shallow == true) {
+          ignore_next_shallow = false;
+        } else {
+          return TRIGGER_SHALLOW_END;
         }
-        
+      }else{
+        shallow_started = false;
+        ms_shallow = 0;
       }
-      us_touch = 0;
+    }  //shallow?
 
-    }
-    ignore_next_tap = false; //make sure this doesnt break everything!
-    return TRIGGER_IDLE;    
-  }//operate
+    bool touch = digitalRead(pin_touch);
+    if (touch == true) {
+      if (ms_touch == 0) {
+        ms_touch = ms;
+      } else if (ms - ms_touch >= TOUCH_START_MS) {
+        if (touch_started == true) {
+          return TRIGGER_TOUCH_ONGOING;
+        } else if(ms - ms_debounce >= DEBOUNCE_MS){
+          touch_started = true;
+          ms_debounce = ms;
+          return TRIGGER_TOUCH_START;
+        }else{//too soon, ignored
+          ms_touch = 0;
+          return TRIGGER_IDLE;
+        }
+      }
+    } else {
+      if (ms - ms_touch >= TOUCH_START_MS
+      and ms - ms_debounce >= DEBOUNCE_MS
+      and ms - ms_touch <= TOUCH_END_MAX_MS
+      and touch_started == true) {  //touching end
+        touch_started = false;
+        ms_touch = 0;
+        ms_debounce = ms;
+        ignore_next_touch = false;
+        return TRIGGER_TOUCH_END;
+      }else{
+        touch_started = false;
+        ms_touch = 0;
+      }
+    }  //touching?
 
-  bool is_menu(){
-    return menu_mode;
-  }
-};//Trigger
+    return TRIGGER_IDLE;
+  }  //operate
+
+};  //Trigger
