@@ -15,8 +15,8 @@ class LED {
 public:
   LED(uint8_t pin)
   : pin(pin) {
+    digitalWrite(pin, LOW); // preload output latch
     pinMode(pin, OUTPUT);
-    analogWrite(pin, 0);
   }
 
   void operate() {
@@ -26,18 +26,15 @@ public:
         actual++;
         increase_ms = ms;
       }
-      
     }else if (actual > goal){
       if (ms - decrease_ms >= DECREASE_DELAY_MS){
         actual--;
         decrease_ms = ms;
       }
     }
-    
     if (ARMED == true){
       analogWrite(pin, POWERS_64[actual]);
     }
-    
   }
 
   void set(uint8_t value) {

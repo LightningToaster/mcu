@@ -49,7 +49,7 @@ public:
   volatile uint8_t selected_char = 0;
   char pin_entered[PIN_LENGTH + 1];  //extra for null char
 
-  volatile uint8_t display_mode = 0;
+  volatile uint8_t display_mode = display_logo;
   volatile uint8_t logo_index = START_LOGO_INDEX;
   volatile uint8_t selection = 0;
   volatile uint16_t fired_from_mag = 0;
@@ -89,6 +89,7 @@ public:
     multicore_launch_core1(core1_entry);
 
     randomSeed(rp2040.hwrand32());
+    randomize_starting_pin();
 
     return true;
   }
@@ -103,6 +104,7 @@ public:
     }
 
     pin_entered[PIN_LENGTH] = '\0';
+    selected_char = 0;
   }
 
   void next_profile(){
@@ -216,8 +218,8 @@ private:
         case display_logo: oled.draw_logo(logo_index); break;
         case display_info: oled.draw_info(); break;
         case display_metrics: oled.draw_metrics(settings, darts_session, IR, voltage_percent, voltage_cell, voltage_pack, failed_logins_report); break;
-        case display_menu: oled.draw_menu(settings, selection, darts_session, failed_logins_report); break;
-        case display_ammo: oled.draw_ammo(fired_from_mag); break;
+        case display_menu: oled.draw_menu(settings, selection, darts_session, voltage_percent, failed_logins_report); break;
+        case display_ammo: oled.draw_ammo(fired_from_mag, voltage_cell); break;
         case display_empty: oled.draw_empty(voltage_cell, fired_from_mag); break;
         case display_battery: oled.draw_battery(battery_status, voltage_cell); break;
       }

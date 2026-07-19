@@ -455,5 +455,4 @@ const logo_t logos[]{
 	{ epd_bitmap_aperture_science_emblem, 128, 64, 0, 0 },
 	{ epd_bitmap_backstabbed_knight_128x64, 128, 64, 32, 0 },
 	
-	
 };

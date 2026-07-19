@@ -20,8 +20,8 @@ private:
   static constexpr float REFERENCE_VOLTAGE = 3.39;
   static constexpr float R1 = 47000.0;
   static constexpr float R2 = 10000.0;
-  static constexpr uint8_t NUM_SAMPLES = 20;
-  static constexpr uint8_t MS_BETWEEN_READS = 50;
+  static constexpr uint8_t NUM_SAMPLES = 1;
+  static constexpr uint8_t MS_BETWEEN_READS = 127;
   static constexpr uint8_t NUM_CELLS = 4;
   static constexpr float VOLTAGE_DIVIDER_RATIO = (R1 + R2) / R2;
 
@@ -30,6 +30,7 @@ private:
   uint8_t buffer_index = 0;
   unsigned long last_read_time = 0;
   float cached_voltage = 0.0;
+  uint8_t last_percent = 0;
 
 public:
   Battery(uint8_t pin)
@@ -47,40 +48,60 @@ public:
     return get_status();
   }
 
-  void get_string(char* buffer, uint8_t format = PACK) const {
+  void get_string(char* buffer, uint8_t format = PACK) {
     size_t length = 8;
     if (length == 0) return;
 
     switch (format) {
 
-      case CELL:
-        //if (cached_voltage >= 6.0){
-          snprintf(buffer, length, "%.2fV", cached_voltage / NUM_CELLS);
-        //}else{
-          //snprintf(buffer, length, "0V");
-        //}
-        
-        break;
+      case CELL:{//55us
+        uint16_t centivolts = (uint16_t)(cached_voltage * 25.0f + 0.5f); // 4 cells
+        buffer[0] = '0' + (centivolts / 100);
+        buffer[1] = '.';
+        buffer[2] = '0' + (centivolts / 10) % 10;
+        buffer[3] = '0' + centivolts % 10;
+        buffer[4] = 'V';
+        buffer[5] = '\0';
+          //snprintf(buffer, length, "%.2fV", cached_voltage / NUM_CELLS);
+      break;}
 
-      case PACK:
-        snprintf(buffer, length, "%.1fV", cached_voltage);
-        break;
+      case PACK:{ //44us
+        uint16_t decivolts = (uint16_t)(cached_voltage * 10.0f + 0.5f);
+        buffer[0] = '0' + (decivolts / 100);
+        buffer[1] = '0' + (decivolts / 10) % 10;
+        buffer[2] = '.';
+        buffer[3] = '0' + decivolts % 10;
+        buffer[4] = 'V';
+        buffer[5] = '\0';
+        //snprintf(buffer, length, "%.1fV", cached_voltage);
+      break;}
 
-      case PERCENTAGE:
-        {
-          int32_t v = (int32_t)(cached_voltage * 100.0f);
+      case PERCENTAGE: {
+        int32_t v = (int32_t)(cached_voltage * 100.0f + 0.5f);
+        constexpr int32_t v_min = (int32_t)(VOLTAGE_MIN_4S * 100.0f + 0.5f);
+        constexpr int32_t v_max = (int32_t)(VOLTAGE_MAX_4S * 100.0f + 0.5f);
+        if (v < v_min) v = v_min;
+        if (v > v_max) v = v_max;
+        uint8_t percent = ((v - v_min) * 100) / (v_max - v_min);
+        if (percent < last_percent || percent > last_percent + 1) last_percent = percent;
 
-          const int32_t v_min = (int32_t)(VOLTAGE_MIN_4S * 100.0f);
-          const int32_t v_max = (int32_t)(VOLTAGE_MAX_4S * 100.0f);
-
-          if (v < v_min) v = v_min;
-          if (v > v_max) v = v_max;
-
-          int percent = ((v - v_min) * 100) / (v_max - v_min);
-
-          snprintf(buffer, length, "%d%%", percent);
-          break;
+        if (last_percent == 100) {
+            buffer[0] = '1';
+            buffer[1] = '0';
+            buffer[2] = '0';
+            buffer[3] = '%';
+            buffer[4] = '\0';
+        } else if (last_percent >= 10) {
+            buffer[0] = '0' + last_percent / 10;
+            buffer[1] = '0' + last_percent % 10;
+            buffer[2] = '%';
+            buffer[3] = '\0';
+        } else {
+            buffer[0] = '0' + last_percent;
+            buffer[1] = '%';
+            buffer[2] = '\0';
         }
+      break;}
 
       default:
         snprintf(buffer, length, "?");

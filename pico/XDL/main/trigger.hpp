@@ -1,6 +1,6 @@
 //valkor 2026-7-16
 //XDL custom 3 stage trigger
-//known bug: deep and shallow increments dont interact correctly.
+//known bug: deep and shallow increments dont interact correctly.  (shallow disabled)
 
 
 enum TRIGGER_STATE : uint8_t {
@@ -40,6 +40,7 @@ private:
   unsigned long ms_shallow = 0;
   unsigned long ms_deep = 0;
   unsigned long ms_debounce = 0;
+  unsigned long last_activity_s = 0;
   bool touch_started = false;
   bool shallow_started = false;
   bool deep_started = false;
@@ -60,6 +61,14 @@ public:
     pinMode(pin_deep, INPUT_PULLUP);
   }  //Trigger
 
+  bool was_inactive_for_minutes(unsigned long minutes){
+    return millis()/1000 - last_activity_s >= minutes*60;
+  };
+
+  void reset_inactivity(){
+    last_activity_s = millis()/1000;
+  }
+
   TRIGGER_STATE operate() {
     unsigned long ms = millis();
     if (ms < 1000) return TRIGGER_IDLE;  //trigger state invalid on power on
@@ -74,6 +83,7 @@ public:
         ignore_next_deep = true;
         return TRIGGER_DEEP_INCREMENT;
       } else if (ms - ms_deep >= DEEP_START_MS) {
+        last_activity_s = millis()/1000;
         ignore_next_shallow = true;
         if (deep_started == true) {
           return TRIGGER_DEEP_ONGOING;
@@ -116,6 +126,7 @@ public:
       //     return TRIGGER_SHALLOW_INCREMENT;
       //   }
       } else if (ms - ms_shallow >= SHALLOW_START_MS) {
+        last_activity_s = millis()/1000;
         ignore_next_touch = true;
         if (shallow_started == true) {
           return TRIGGER_SHALLOW_ONGOING;
@@ -151,6 +162,7 @@ public:
       if (ms_touch == 0) {
         ms_touch = ms;
       } else if (ms - ms_touch >= TOUCH_START_MS) {
+        last_activity_s = millis()/1000;
         if (touch_started == true) {
           return TRIGGER_TOUCH_ONGOING;
         } else if(ms - ms_debounce >= DEBOUNCE_MS){

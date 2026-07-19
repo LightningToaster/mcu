@@ -2,13 +2,8 @@
 /*TODO
 revisit buzzer using blinkometer v3 class 
 compensate power with voltage
-test loop timing make sure fast
-add voltage to main darts fired screen for testing only
-investigate low voltage, does it flip back and forth?  does it need a flag?
-missing sounds on stuff
-put voltge on menu
-system lockout at 30min no input or 8h
-change lipo
+low voltage probably flips back and forth.. better add a flag etc..
+you can make a better usa flag..
 */
 #define BLASTER_NAME "BLASTOMATIC MK2"
 #define BLASTER_OWNER "valkor"
@@ -31,18 +26,19 @@ change lipo
 #define PIN_ESC_0 8  //left esc, right motor
 #define PIN_ESC_1 9  //right esc, left motor
 
-#define MAX_POWER 50
+#define REQUIRE_PIN false  //set to false to disable pinlock
+#define AUTOLOCK_INACTIVITY_MINUTES 30  //if require pin is enabled, will lock after this many minutes of inactivity
+
+#define MAX_POWER 60
+#define ARMED true // wheels and solenoid will only operate if this is true
 #define RESET_SAVE false  //set true to override save with defaults
 #define IGNORE_DART_DETECTION true
-#define ARMED false // wheels and solenoid will only operate if this is true
-
-
-bool is_locked = false;  //set to false to disable pinlock
-static constexpr char pin_combo[] = "123";
-#define PIN_LENGTH 3    //must be the length of pin_combo
-
+#define AMMO_VOLTAGE_READOUT true
 
 #include <Arduino.h>
+
+#include "pinlock.hpp"
+PinLock pinlock;
 
 #include "battery.hpp"
 Battery battery(PIN_BATTERY);
@@ -50,23 +46,20 @@ Battery battery(PIN_BATTERY);
 #include "core1.hpp"
 Core1 core;
 
-#include "buzzer.hpp"
-Buzzer buzzer(PIN_BUZZER);
+#include "uv_led.hpp"
+LED uv_led(PIN_UV);
 
 #include "indicator_led.hpp"
 IndicatorLED indicator_led;
 
-#include "uv_led.hpp"
-LED uv_led(PIN_UV);
+#include "buzzer.hpp"
+Buzzer buzzer(PIN_BUZZER);
 
 #include "switch.hpp"
 Switch menu_switch(PIN_MENU_SWITCH);
 
 #include "trigger.hpp"
 Trigger trigger(PIN_TRIGGER_TOUCH, PIN_TRIGGER_SHALLOW, PIN_TRIGGER_DEEP);
-
-#include "pinlock.hpp"
-PinLock pin_lock;
 
 #include "dart.hpp"
 DartDetector dart(PIN_IR_EMITTER, PIN_IR_RECEIVER);
@@ -82,21 +75,19 @@ void setup() {
   while (!Serial && millis() <= 1000) { delay(50); }
   wheels.begin();
   core.begin(PIN_SDA, PIN_SCL);
-  core.display_mode = display_logo;
-  core.randomize_starting_pin();
-  indicator_led.set(0, 0, 0, 0);
   delay(2000);  //TODO consider when adding wheels
-  if (is_locked == false){
-    core.display_mode = display_menu;
-  }
+  core.display_mode = display_menu;//overwritten by lockscreen if enabled
 }  //setup
 
-TRIGGER_STATE last = TRIGGER_IDLE;
-
-void loop() {
+void loop() {//print_loop_speed();
   MENU_SWITCH_STATE menu_switch_state = menu_switch.operate();
   TRIGGER_STATE trigger_state = trigger.operate();
-
+  if (REQUIRE_PIN and menu_switch.was_inactive_for_minutes(AUTOLOCK_INACTIVITY_MINUTES) and trigger.was_inactive_for_minutes(AUTOLOCK_INACTIVITY_MINUTES)){
+    core.randomize_starting_pin();//display only, not security related
+    pinlock.lock();
+    menu_switch.reset_inactivity();
+    trigger.reset_inactivity();
+  }
   buzzer.operate();
   core.battery_status = battery.operate();
   battery.get_string(core.voltage_cell, CELL);
@@ -110,21 +101,19 @@ void loop() {
   bool dart_was_fired = solenoid.operate(wheels_revd);
   if (dart_was_fired) { core.dart_fired();}
 
-
-  if (is_locked == true) {
+  if (pinlock.is_locked()) {
     core.display_mode = display_lock;
-    if (pin_lock.is_ready() == true) {
+    if (pinlock.is_ready() == true) {
       core.pin_failed = false;
       if (trigger_state == TRIGGER_TOUCH_END) {
         buzzer.beep(120, 30);
         core.selected_char = (core.selected_char + 1) % PIN_LENGTH; //TODO core method()
       } else if (trigger_state == TRIGGER_SHALLOW_END) { 
         core.pin_entered[core.selected_char] =
-          ((core.pin_entered[core.selected_char] - '0' + 1) % 10) + '0';
+          ((core.pin_entered[core.selected_char] - '0' + 1) % 10) + '0';//TODO core method()
         buzzer.beep(300, 50);
       } else if (trigger_state == TRIGGER_DEEP_END) {
-        if (pin_lock.verify(core.pin_entered) == true) {  //correct pin entered
-          is_locked = false;
+        if (pinlock.verify(core.pin_entered) == true) {  //correct pin entered
           if (menu_switch_state == SWITCH_CLOSED){
             core.display_mode = display_menu;
           }
@@ -150,7 +139,6 @@ void loop() {
   if (menu_switch_state == SWITCH_CLOSED_ACTION) {
     core.selection = 0;  //profile is selected by default
     core.display_mode = display_menu;
-    core.logo_index = 0;
   }
 
   if (menu_switch_state == SWITCH_CLOSED or menu_switch_state == SWITCH_CLOSED_ACTION) {
@@ -199,6 +187,7 @@ void loop() {
 
     }else{//not in menu
       if (trigger_state == TRIGGER_DEEP_END) {
+        core.logo_index = 0;
         switch(core.display_mode){
           case display_metrics: core.display_mode = display_info; break;
           case display_info: 
@@ -280,3 +269,27 @@ void loop() {
     }
   }//is_menu?
 }//loop
+
+void print_loop_speed(){
+  static unsigned long last_report_ms = 0;
+  static unsigned long loop_start_us = micros();
+  static uint64_t total_loop_us = 0;
+  static uint32_t loop_count = 0;
+
+  unsigned long now_us = micros();
+  total_loop_us += (unsigned long)(now_us - loop_start_us);
+  loop_count++;
+  loop_start_us = now_us;
+
+  if (millis() - last_report_ms >= 1000) {
+      last_report_ms += 1000;
+
+      Serial.print("avg loop: ");
+      Serial.print(total_loop_us / loop_count);
+      Serial.print(" us, loops/s: ");
+      Serial.println(loop_count);
+
+      total_loop_us = 0;
+      loop_count = 0;
+  }
+}//print_loop_speed

@@ -79,7 +79,7 @@ public:
     oled->setTextColor(SH110X_WHITE);
     oled->setTextSize(1);
 
-    oled->drawRect(0, 0, 128, 64, SH110X_WHITE);
+    //oled->drawRect(0, 0, 128, 64, SH110X_WHITE);
 
     const logo_t& logo = logos[logo_index];
     oled->drawBitmap(logo.x, logo.y, logo.bitmap,
@@ -87,7 +87,7 @@ public:
                      SH110X_WHITE);
   }  //draw_logo
 
-  void draw_menu(settings_t& settings, uint8_t selection, uint32_t darts_session, uint16_t failed_logins_report = 0) {
+  void draw_menu(settings_t& settings, uint8_t selection, uint32_t darts_session, char* voltage, uint16_t failed_logins_report = 0) {
     oled->setTextColor(SH110X_WHITE);
     oled->setTextSize(1);
 
@@ -154,24 +154,36 @@ public:
       case 3: oled->printf("glow: HIGH"); break;
     }
 
-    oled->drawRect(0, 40, 127, 1, SH110X_WHITE);  //divider
+    oled->drawRect(0, 41, 127, 1, SH110X_WHITE);  //divider
 
+    oled->setTextSize(2);
+    //Serial.println(strlen(voltage));
+    switch(strlen(voltage)){
+      case 5: oled->setCursor(68, 48); break;
+      case 4: oled->setCursor(80, 48); break;
+      case 3: oled->setCursor(92, 48); break;
+      case 2: oled->setCursor(104, 48); break;
+    }
+    //oled->printf("99%%");
+    oled->printf("%s", voltage);
+
+    oled->setTextSize(1);
     uint32_t seconds = millis() / 1000;
     uint16_t minutes = seconds / 60;
     uint16_t hours = minutes / 60;
     oled->setCursor(0, 46);
-    oled->print("uptime: ");
+    oled->print("upT: ");
     if (hours) oled->printf("%uh ", hours);
     if (minutes) oled->printf("%um ", minutes % 60);
     if (!hours) oled->printf("%us", seconds % 60);
 
-    if (failed_logins_report > 0) {
-      oled->setCursor(112, 46);
-      oled->printf("%u", failed_logins_report);
-    }
-
     oled->setCursor(0, 56);
-    oled->printf("darts launched: %u", darts_session);
+    oled->printf("DLS: %u", darts_session);
+
+    // if (failed_logins_report > 0) {
+    //   oled->setCursor(112, 46);
+    //   oled->printf("%u", failed_logins_report);
+    // }
 
   }  //draw_menu
 
@@ -214,7 +226,7 @@ public:
     oled->print("up_time: ");
     if (hours) oled->printf("%uh ", hours);
     if (minutes) oled->printf("%um ", minutes % 60);
-    if (!hours) oled->printf("%us", seconds % 60);
+    oled->printf("%us", seconds % 60);
 
     oled->setCursor(0, 9);
     oled->print("op_time: ");
@@ -240,23 +252,31 @@ public:
     }
   }  //draw_metrics
 
-  void draw_ammo(uint16_t ammo) {
+  void draw_ammo(uint16_t ammo, const char* voltage) {
     oled->setTextColor(SH110X_WHITE);
 
-    if (ammo <= 9) {
-      oled->setTextSize(9);
-      oled->setCursor(46, 0);
-    } else if (ammo <= 99) {
-      oled->setTextSize(8);
-      oled->setCursor(22, 5);
-    } else if (ammo <= 999) {
-      oled->setTextSize(7);
-      oled->setCursor(2, 7);
-    } else {
-      oled->setTextSize(5);
-      oled->setCursor(5, 15);
-    }
+    if (AMMO_VOLTAGE_READOUT){
+      oled->setTextSize(3);
+      oled->setCursor(0, 40);//56
+      oled->print(voltage);
 
+      oled->setTextSize(4);
+      oled->setCursor(0, 0);
+    }else{
+      if (ammo <= 9) {
+        oled->setTextSize(9);
+        oled->setCursor(46, 0);
+      } else if (ammo <= 99) {
+        oled->setTextSize(8);
+        oled->setCursor(22, 5);
+      } else if (ammo <= 999) {
+        oled->setTextSize(7);
+        oled->setCursor(2, 7);
+      } else {
+        oled->setTextSize(5);
+        oled->setCursor(5, 15);
+      }
+    }
     oled->print(ammo);
   }
 
@@ -283,9 +303,10 @@ public:
     switch (status) {
       case BATTERY_DISCONNECTED:
         oled->setTextSize(1);
-        oled->setCursor(45, 5);
+        oled->setCursor(43, 8);
         oled->print("BATTERY");
-        oled->setCursor(30, 18);
+        oled->setTextSize(1);
+        oled->setCursor(28, 20);
         oled->print("DISCONNECTED");
         break;
 

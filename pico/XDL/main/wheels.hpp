@@ -55,7 +55,6 @@ public:
     int32_t difference = static_cast<int32_t>(speed_goal) - speed_now;
 
     if (difference > 0) {  // need to speed up
-      //analogWrite(PIN_UV, uv);
       if (now - ms >= 1) {
         ms = now;
         speed_now += (2 + ceil(difference / 200.0));
@@ -66,8 +65,8 @@ public:
       }
 
     } else if (difference < 0) {          // need to slow down
-      uint16_t step = (braking ? 3 : 1);  // braking accelerates decel
-      uint16_t interval = (braking ? 1 : 10);
+      uint16_t step = (braking ? 3 : 1);  // 20 how much throttle per step
+      uint16_t interval = (braking ? 1 : 2); //100  //interval(ms) is happens at
       if (now - ms >= interval) {
         ms = now;
         if (speed_now > step) {

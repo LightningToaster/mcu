@@ -1,4 +1,3 @@
-#pragma once
 //mostly AI written
 class Fram {
 public:

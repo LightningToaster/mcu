@@ -28,6 +28,7 @@ public:
     strip->begin();
     strip->clear();
     strip->show();
+    set(0, 0, 0, 0);
   }//IndicatorLED
 
   void set_color(uint8_t color, uint16_t ms = 0) {
@@ -175,6 +176,4 @@ private:
     }
     return 31;
   }
-
-
 };//IndicatorLED
