@@ -12,7 +12,7 @@ public:
     oled = driver;
   }
 
-  void clear() {  //TODO remove this...
+  void clear() { 
     oled->clearDisplay();
   }
 
@@ -52,13 +52,13 @@ public:
       if (i == selected_char) {
         oled->setCursor(x - 1, 37);
         oled->print(pin_entered[i]);
+        if ((millis() / 250) % 2 == 0) {
+          oled->drawRect(x-1, 46, 5, 1, SH110X_WHITE);
+        }
       } else {
         oled->fillCircle(x, 40, 2, SH110X_WHITE);
       }
     }
-
-    //oled->setCursor(0, 56);
-    //oled->print("Authentication Failed.");
   }  //draw_lock
 
   void draw_splash() {
@@ -79,6 +79,8 @@ public:
     oled->setTextColor(SH110X_WHITE);
     oled->setTextSize(1);
 
+    oled->drawRect(0, 0, 128, 64, SH110X_WHITE);
+
     const logo_t& logo = logos[logo_index];
     oled->drawBitmap(logo.x, logo.y, logo.bitmap,
                      logo.width, logo.height,
@@ -91,24 +93,24 @@ public:
 
     if ((millis() / 200) % 2 == 0) {
       if (selection == 0) {
-        oled->drawRect(0, 3, 35, 30, SH110X_WHITE);
+        oled->drawRect(0, 2, 39, 32, SH110X_WHITE);
       } else if (selection <= 4) {
-        oled->setCursor(46, (selection - 1) * 9);
+        oled->setCursor(48, (selection - 1) * 14);
         oled->print(">");
       }
     } else {
 
-      oled->setCursor(46, (selection - 1) * 10);
+      oled->setCursor(48, (selection - 1) * 14);
       oled->print("-");
       if (selection == 0) {
-        oled->drawRect(1, 4, 33, 28, SH110X_WHITE);
+        oled->drawRect(1, 3, 37, 30, SH110X_WHITE);
       }
     }
 
-    oled->setCursor(3, 10);  //102
+    oled->setCursor(5, 10);
     oled->setTextSize(2);
     oled->print("P");
-    oled->setCursor(17, 7);
+    oled->setCursor(20, 7);
     oled->setTextSize(3);
     oled->print(settings.profile);
 
@@ -132,19 +134,19 @@ public:
     }  //which profile
 
     oled->setTextSize(1);
-    oled->setCursor(54, 0);
+    oled->setCursor(56, 0);
     if (volley == 0) {
       oled->printf("volley: OFF");
     } else if (volley < 3) {
       oled->printf("volley: +%u", volley);
     } else {
-      oled->printf("volley: AUTO");  //TODO infinity symbol?
+      oled->printf("volley: AUTO");
     }
 
-    oled->setCursor(54, 10);
+    oled->setCursor(56, 14);
     oled->printf("power: %u%%", power);
 
-    oled->setCursor(54, 20);
+    oled->setCursor(56, 28);
     switch (glow) {
       case 0: oled->printf("glow: OFF"); break;
       case 1: oled->printf("glow: LOW"); break;
@@ -173,7 +175,7 @@ public:
 
   }  //draw_menu
 
-  void draw_info(uint32_t minutes, uint32_t launched, char* voltage) {
+  void draw_info() {
     oled->setTextColor(SH110X_WHITE);
     oled->setTextSize(1);
 
@@ -181,36 +183,62 @@ public:
     oled->print(BLASTER_NAME);
 
     oled->setCursor(0, 9);
-    oled->printf("owner: %s", BLASTER_OWNER);
-
+    oled->printf("DOM: %s", BLASTER_BUILD_DATE);
+    
     oled->setCursor(0, 18);
-    oled->printf("%s %s %s", BLASTER_SERIAL, BLASTER_BUILD_DATE, FIRMWARE_VERSION);
+    oled->printf("SN: %s", BLASTER_SERIAL);
 
     oled->setCursor(0, 27);
-    oled->print("designed by valkor");
+    oled->printf("FW: %s", FIRMWARE_VERSION);
 
-    oled->drawRect(0, 36, 127, 1, SH110X_WHITE);  //divider
-
-
-    oled->setCursor(0, 39);
-    oled->print("op_hours: ");
-    if (minutes >= 60) {
-      oled->printf("%uh ", minutes / 60);
-    }
-    oled->printf("%um", minutes % 60);
-
-    oled->setCursor(0, 48);
-    oled->printf("ATDL: %u", launched);
+    oled->setCursor(0, 36);
+    oled->printf("owner: %s", BLASTER_OWNER);
 
     oled->setCursor(0, 56);
-    oled->print(voltage);
+    oled->print("designed by valkor");
 
-    //TODO add IR output
-
+    const logo_t& logo = logos[0];
+    oled->drawBitmap(logo.x, logo.y, logo.bitmap,
+                     logo.width, logo.height,
+                     SH110X_WHITE);
   }  //draw_info
 
+  void draw_metrics(settings_t& settings, uint16_t darts_session, uint8_t IR, char* voltage_percent, char* voltage_cell, char* voltage_pack, uint16_t failed_logins_report) {
+    oled->setTextColor(SH110X_WHITE);
+    oled->setTextSize(1);
 
+    uint32_t seconds = millis() / 1000;
+    uint16_t minutes = seconds / 60;
+    uint16_t hours = minutes / 60;
+    oled->setCursor(0, 0);
+    oled->print("up_time: ");
+    if (hours) oled->printf("%uh ", hours);
+    if (minutes) oled->printf("%um ", minutes % 60);
+    if (!hours) oled->printf("%us", seconds % 60);
 
+    oled->setCursor(0, 9);
+    oled->print("op_time: ");
+    if (settings.minutes >= 60) {
+      oled->printf("%uh ", settings.minutes / 60);
+    }
+    oled->printf("%um", settings.minutes % 60);
+
+    oled->setCursor(0, 18);
+    oled->printf("DLS: %u", darts_session);
+    oled->setCursor(0, 27);
+    oled->printf("DLT: %u", settings.launched);
+
+    oled->setCursor(0, 36);
+    oled->printf("IR: %u", IR);
+
+    oled->setCursor(0, 45);
+    oled->printf("B: %s %s %s", voltage_percent, voltage_cell, voltage_pack);
+
+    if (failed_logins_report > 0) {
+      oled->setCursor(0, 54);
+      oled->printf("failed logins: %u", failed_logins_report);
+    }
+  }  //draw_metrics
 
   void draw_ammo(uint16_t ammo) {
     oled->setTextColor(SH110X_WHITE);
@@ -240,20 +268,20 @@ public:
     oled->print("EMPTY");
 
     oled->setTextSize(1);
-    oled->setCursor(50, 54);
+    oled->setCursor(98, 56);//50
     oled->print(voltage);
 
     if (fired > 0) {
-      oled->setCursor(0, 54);
-      oled->print(fired);
+      oled->setCursor(0, 56);
+      oled->printf("%u", fired);
     }
   }
 
-  void draw_battery(uint8_t state, const char* voltage) {
+  void draw_battery(uint8_t status, const char* voltage) {
     oled->setTextColor(SH110X_WHITE);
 
-    switch (state) {
-      case battery_disconnected:
+    switch (status) {
+      case BATTERY_DISCONNECTED:
         oled->setTextSize(1);
         oled->setCursor(45, 5);
         oled->print("BATTERY");
@@ -261,7 +289,7 @@ public:
         oled->print("DISCONNECTED");
         break;
 
-      case battery_low:
+      case BATTERY_LOW:
         oled->setTextSize(2);
         oled->setCursor(25, 5);
         oled->print("BATTERY");
@@ -272,13 +300,13 @@ public:
         oled->print(voltage);
         break;
 
-      case battery_good:
+      case BATTERY_GOOD:
         oled->setTextSize(2);
         oled->setCursor(39, 25);
         oled->print(voltage);
         break;
 
-      case battery_overcharged:
+      case BATTERY_OVERCHARGED:
         oled->setTextSize(3);
         oled->setCursor(2, 0);
         oled->print("DANGER!");

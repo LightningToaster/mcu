@@ -1,5 +1,6 @@
 //valkor 2026-7-16
 //XDL custom 3 stage trigger
+//known bug: deep and shallow increments dont interact correctly.
 
 
 enum TRIGGER_STATE : uint8_t {
@@ -25,10 +26,10 @@ private:
   const uint8_t TOUCH_END_MAX_MS = 150;
   const uint8_t SHALLOW_START_MS = 3;
   const uint8_t SHALLOW_END_MS = 20;          //must be down for this long to register an end
-  const uint16_t SHALLOW_INCREMENT_MS = 250;  //for example, wait 250ms then return, and repeat
+  //const uint16_t SHALLOW_INCREMENT_MS = 250;  //for example, wait 250ms then return, and repeat
   const uint8_t DEEP_START_MS = 8;
   const uint8_t DEEP_END_MS = 20;          //must be down for this long to register an end
-  const uint16_t DEEP_INCREMENT_MS = 500;  //for example, wait 250ms then return, and repeat
+  const uint16_t DEEP_INCREMENT_MS = 200;  //for example, wait 250ms then return, and repeat
   const uint8_t DEBOUNCE_MS = 20;       
 
   uint8_t pin_touch;
@@ -44,6 +45,7 @@ private:
   bool deep_started = false;
   bool ignore_next_touch = false;
   bool ignore_next_shallow = false;
+  bool ignore_next_deep = false;
 
 public:
   Trigger(
@@ -68,6 +70,8 @@ public:
         ms_deep = ms;
       } else if (ms - ms_deep >= DEEP_INCREMENT_MS) {
         ms_deep = ms;
+        ms_debounce = ms;
+        ignore_next_deep = true;
         return TRIGGER_DEEP_INCREMENT;
       } else if (ms - ms_deep >= DEEP_START_MS) {
         ignore_next_shallow = true;
@@ -89,7 +93,11 @@ public:
         deep_started = false;
         ms_deep = 0;
         ms_debounce = ms;
-        return TRIGGER_DEEP_END;
+        if (ignore_next_deep == true) {
+          ignore_next_deep = false;
+        } else {
+          return TRIGGER_DEEP_END;
+        }
       }else{
         deep_started = false;
         ms_deep = 0;
@@ -100,11 +108,13 @@ public:
     if (shallow == true) {
       if (ms_shallow == 0) {
         ms_shallow = ms;
-      } else if (ms - ms_shallow >= SHALLOW_INCREMENT_MS) {
-        ms_shallow = ms;
-        ignore_next_shallow = true;
-        ms_debounce = ms;
-        return TRIGGER_SHALLOW_INCREMENT;
+      // } else if (ms - ms_shallow >= SHALLOW_INCREMENT_MS) {
+      //   ms_shallow = ms;
+      //   ignore_next_shallow = true;
+      //   ms_debounce = ms;
+      //   if (deep == false){
+      //     return TRIGGER_SHALLOW_INCREMENT;
+      //   }
       } else if (ms - ms_shallow >= SHALLOW_START_MS) {
         ignore_next_touch = true;
         if (shallow_started == true) {

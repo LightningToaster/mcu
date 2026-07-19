@@ -8,7 +8,7 @@ enum VOLTAGE_FORMAT : uint8_t {
 enum BATTERY_STATUS : uint8_t {
   BATTERY_DISCONNECTED,  // 0
   BATTERY_LOW,           // 1
-  GOOD,                  // 2
+  BATTERY_GOOD,          // 2
   BATTERY_OVERCHARGED,   // 3
 };
 
@@ -37,28 +37,29 @@ public:
     pinMode(pin, INPUT);
   }
 
-  bool operate() {
-    if (millis() - last_read_time < MS_BETWEEN_READS) return is_ok();
+  BATTERY_STATUS operate() {
+    if (millis() - last_read_time < MS_BETWEEN_READS) return get_status();
     last_read_time = millis();
 
     analog_voltages[buffer_index] = analogRead(pin);
     buffer_index = (buffer_index + 1) % NUM_SAMPLES;
     cached_voltage = compute_voltage();
-    return is_ok();
+    return get_status();
   }
 
-  void get_string(char* buffer, size_t length, uint8_t format = PACK) const {
+  void get_string(char* buffer, uint8_t format = PACK) const {
+    size_t length = 8;
     if (length == 0) return;
-
-    if (!is_ok()) {
-      snprintf(buffer, length, "0V");
-      return;
-    }
 
     switch (format) {
 
       case CELL:
-        snprintf(buffer, length, "%.2fV", cached_voltage / NUM_CELLS);
+        //if (cached_voltage >= 6.0){
+          snprintf(buffer, length, "%.2fV", cached_voltage / NUM_CELLS);
+        //}else{
+          //snprintf(buffer, length, "0V");
+        //}
+        
         break;
 
       case PACK:
@@ -88,14 +89,10 @@ public:
   }  //get_string
 
   BATTERY_STATUS get_status() const {
-    if (cached_voltage < 1.0) return BATTERY_DISCONNECTED;
+    if (cached_voltage < 6.0) return BATTERY_DISCONNECTED;
     if (cached_voltage < VOLTAGE_MIN_4S) return BATTERY_LOW;
-    if (cached_voltage < VOLTAGE_LIMIT) return GOOD;
+    if (cached_voltage < VOLTAGE_LIMIT) return BATTERY_GOOD;
     return BATTERY_OVERCHARGED;
-  }
-
-  bool is_ok() const {
-    return cached_voltage >= VOLTAGE_MIN_4S && cached_voltage <= VOLTAGE_LIMIT;
   }
 
 private:

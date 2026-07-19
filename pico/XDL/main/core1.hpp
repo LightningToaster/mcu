@@ -29,17 +29,12 @@ enum display_mode : uint8_t {  //might not need all these
   display_logo,
   display_info,
   display_menu,
+  display_metrics,
   display_ammo,
   display_empty,
   display_battery,
 };
 
-enum battery_state : uint8_t {
-  battery_disconnected = 0,
-  battery_low,
-  battery_good,
-  battery_overcharged,
-};
 
 #include "fram.hpp"
 #include "oled.hpp"
@@ -55,16 +50,19 @@ public:
   char pin_entered[PIN_LENGTH + 1];  //extra for null char
 
   volatile uint8_t display_mode = 0;
-  volatile uint8_t logo_index = 0;
+  volatile uint8_t logo_index = START_LOGO_INDEX;
   volatile uint8_t selection = 0;
   volatile uint16_t fired_from_mag = 0;
   volatile uint16_t darts_session = 0;
-  volatile uint8_t battery_state = 0;
+  volatile BATTERY_STATUS battery_status = BATTERY_DISCONNECTED;
   volatile bool pin_failed = false;
   uint16_t failed_logins_report = 0;
-  uint32_t last_minute_ms = 0;
+  uint32_t last_minute_ms = 0; //use for op_time
+  uint8_t IR = 0;
 
-  char voltage[8] = { 0 };
+  char voltage_cell[8] = { 0 };
+  char voltage_pack[8] = { 0 };
+  char voltage_percent[8] = { 0 };
 
   settings_t settings;
 
@@ -109,13 +107,12 @@ public:
 
   void next_profile(){
     settings.profile = (settings.profile % 3) + 1;
+    settings_dirty = true;
   }
 
   void next_selection(){
     selection = (selection + 1) % 4;
   }
-
-  
 
   void next_volley(){
     switch (settings.profile) { 
@@ -123,11 +120,12 @@ public:
       case 2: settings.volley2 = (settings.volley2 + 1) % 4; break;
       case 3: settings.volley3 = (settings.volley3 + 1) % 4; break;
     }
+    settings_dirty = true;
   }
   void next_power(uint8_t increment = 1) {
     auto next_power = [increment](uint8_t power) -> uint8_t {
       power = ((power + increment) / increment) * increment;
-      if (power > MAX_POWER) return 0;
+      if (power > MAX_POWER) return 1;
       return power;
     };
 
@@ -136,6 +134,7 @@ public:
       case 2: settings.power2 = next_power(settings.power2); break;
       case 3: settings.power3 = next_power(settings.power3); break;
     }
+    settings_dirty = true;
   }
 
   void next_glow(){
@@ -144,6 +143,7 @@ public:
       case 2: settings.glow2 = (settings.glow2 + 1) % 4; break;
       case 3: settings.glow3 = (settings.glow3 + 1) % 4; break;
     }
+    settings_dirty = true;
   }
 
   uint8_t get_volley(){
@@ -164,6 +164,21 @@ public:
     return 0;
   }
 
+   uint8_t get_glow(){
+    switch (settings.profile) { 
+      case 1: return settings.glow1; break;
+      case 2: return settings.glow2; break;
+      case 3: return settings.glow3; break;
+    }
+    return 0;
+  }
+
+  void dart_fired(){
+    fired_from_mag++; 
+    darts_session++;
+    settings.launched++; 
+    settings_dirty = true;
+  }
 private:
   unsigned long last_frame = 0;
   static constexpr uint32_t frame_ms = 33;
@@ -199,11 +214,12 @@ private:
         case display_splash: oled.draw_splash(); break;
         case display_lock: oled.draw_lock(selected_char, pin_entered, pin_failed); break;
         case display_logo: oled.draw_logo(logo_index); break;
-        case display_info: oled.draw_info(settings.minutes, settings.launched, voltage); break;
+        case display_info: oled.draw_info(); break;
+        case display_metrics: oled.draw_metrics(settings, darts_session, IR, voltage_percent, voltage_cell, voltage_pack, failed_logins_report); break;
         case display_menu: oled.draw_menu(settings, selection, darts_session, failed_logins_report); break;
         case display_ammo: oled.draw_ammo(fired_from_mag); break;
-        case display_empty: oled.draw_empty(voltage, fired_from_mag); break;
-        case display_battery: oled.draw_battery(battery_state, voltage); break;
+        case display_empty: oled.draw_empty(voltage_cell, fired_from_mag); break;
+        case display_battery: oled.draw_battery(battery_status, voltage_cell); break;
       }
 
       oled.display();

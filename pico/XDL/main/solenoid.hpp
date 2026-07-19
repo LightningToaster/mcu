@@ -38,7 +38,7 @@ public:
     return false;
   }
 
-  void fire(uint8_t volley) {
+  void fire(uint8_t volley = 1) {
     if (volley > 0){
       //Serial.println(volley);
     }

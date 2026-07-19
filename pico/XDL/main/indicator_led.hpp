@@ -20,15 +20,15 @@ const uint8_t COLORS[][3] = {
 
 #include <Adafruit_NeoPixel.h>
 
-class LED {
+class IndicatorLED {
 public:
-  LED(uint8_t pin = 25)  //25 by default
+  IndicatorLED(uint8_t pin = 25)  //25 by default
   : pin(pin) {
     strip = new Adafruit_NeoPixel(1, pin, NEO_GRB + NEO_KHZ800);
     strip->begin();
     strip->clear();
     strip->show();
-  }
+  }//IndicatorLED
 
   void set_color(uint8_t color, uint16_t ms = 0) {
     set(
@@ -177,4 +177,4 @@ private:
   }
 
 
-};  //LED
+};//IndicatorLED

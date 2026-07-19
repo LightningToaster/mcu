@@ -132,7 +132,7 @@ private:
   bool mag_empty = false;
 
   static constexpr uint16_t settle_time_us = 200;
-  static constexpr uint8_t sample_count = 8;
-  static constexpr int threshold = 10;
-  static constexpr uint16_t mag_empty_delay_ms = 250;
+  static constexpr uint8_t sample_count = 10;
+  static constexpr int threshold = 12;
+  static constexpr uint16_t mag_empty_delay_ms = 100;
 };

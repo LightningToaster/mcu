@@ -8,7 +8,7 @@ class Wheels {
 
 private:
   static constexpr uint16_t THROTTLE_ARM = 1030;   // below for reliability?
-  static constexpr uint16_t THROTTLE_IDLE = 1060;  // seems quiet
+  static constexpr uint16_t THROTTLE_IDLE = 1038;  // seems quiet
   static constexpr uint16_t THROTTLE_MIN = 1115;   // determines lowest fps allowed
   //TODO may want a "hard max".. so that there is headroom for higher throttle if voltage low
   //.. or dont?  MAX_POWER might not be set to 100?  idk
@@ -41,7 +41,7 @@ public:
     begun = true;
   }
 
-  bool operate() {
+  bool operate(uint8_t uv = 1) {
     if (not begun) (begin());
     uint32_t now = millis();
     if (now < ESC_ARM_DELAY) { return false; }
@@ -55,6 +55,7 @@ public:
     int32_t difference = static_cast<int32_t>(speed_goal) - speed_now;
 
     if (difference > 0) {  // need to speed up
+      //analogWrite(PIN_UV, uv);
       if (now - ms >= 1) {
         ms = now;
         speed_now += (2 + ceil(difference / 200.0));
