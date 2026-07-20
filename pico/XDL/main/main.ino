@@ -5,7 +5,7 @@ compensate power with voltage
 low voltage probably flips back and forth.. better add a flag etc..
 you can make a better usa flag..
 */
-#define BLASTER_NAME "BLASTOMATIC MK2"
+#define BLASTER_NAME "VALKONATOR MK2"
 #define BLASTER_OWNER "valkor"
 #define BLASTER_SERIAL "0002"
 #define BLASTER_BUILD_DATE "2026.6.12"

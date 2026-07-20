@@ -83,7 +83,7 @@ public:
         if (v < v_min) v = v_min;
         if (v > v_max) v = v_max;
         uint8_t percent = ((v - v_min) * 100) / (v_max - v_min);
-        if (percent < last_percent || percent > last_percent + 1) last_percent = percent;
+        if (percent < last_percent || percent > last_percent + 2) last_percent = percent;
 
         if (last_percent == 100) {
             buffer[0] = '1';

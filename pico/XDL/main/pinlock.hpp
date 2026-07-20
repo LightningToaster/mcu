@@ -8,12 +8,12 @@ class PinLock {
 public:
   bool verify(const char *pin) {
     if (strcmp(pin, pin_combo) == 0) {
-      Serial.println("CORRECT PIN!");
+      //Serial.println("CORRECT PIN!");
       locked = false;
       return true;
     }
     ms = millis();
-    Serial.println("WRONG PIN!");
+    //Serial.println("WRONG PIN!");
     return false;
   }
 
