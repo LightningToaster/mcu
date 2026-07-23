@@ -15,13 +15,13 @@ enum BATTERY_STATUS : uint8_t {
 class Battery {
 private:
   static constexpr float VOLTAGE_MIN_4S = 14.0;
-  static constexpr float VOLTAGE_MAX_4S = 16.8;
+  static constexpr float VOLTAGE_MAX_4S = 16.64;
   static constexpr float VOLTAGE_LIMIT = 17.2;  //shuts off
-  static constexpr float REFERENCE_VOLTAGE = 3.39;
+  static constexpr float REFERENCE_VOLTAGE = 3.25;
   static constexpr float R1 = 47000.0;
   static constexpr float R2 = 10000.0;
-  static constexpr uint8_t NUM_SAMPLES = 1;
-  static constexpr uint8_t MS_BETWEEN_READS = 127;
+  static constexpr uint8_t NUM_SAMPLES = 4;//1
+  static constexpr uint8_t MS_BETWEEN_READS = 10;
   static constexpr uint8_t NUM_CELLS = 4;
   static constexpr float VOLTAGE_DIVIDER_RATIO = (R1 + R2) / R2;
 
@@ -30,7 +30,9 @@ private:
   uint8_t buffer_index = 0;
   unsigned long last_read_time = 0;
   float cached_voltage = 0.0;
+  BATTERY_STATUS last_status = BATTERY_DISCONNECTED;
   uint8_t last_percent = 0;
+
 
 public:
   Battery(uint8_t pin)
@@ -45,6 +47,7 @@ public:
     analog_voltages[buffer_index] = analogRead(pin);
     buffer_index = (buffer_index + 1) % NUM_SAMPLES;
     cached_voltage = compute_voltage();
+    //Serial.println(cached_voltage);//use this for calibration
     return get_status();
   }
 
@@ -62,7 +65,7 @@ public:
         buffer[3] = '0' + centivolts % 10;
         buffer[4] = 'V';
         buffer[5] = '\0';
-          //snprintf(buffer, length, "%.2fV", cached_voltage / NUM_CELLS);
+          //snprintf(buffer, length, "%.2fV", cached_voltage / NUM_CELLS);//old way
       break;}
 
       case PACK:{ //44us
@@ -73,16 +76,11 @@ public:
         buffer[3] = '0' + decivolts % 10;
         buffer[4] = 'V';
         buffer[5] = '\0';
-        //snprintf(buffer, length, "%.1fV", cached_voltage);
+        //snprintf(buffer, length, "%.1fV", cached_voltage);//old way
       break;}
 
       case PERCENTAGE: {
-        int32_t v = (int32_t)(cached_voltage * 100.0f + 0.5f);
-        constexpr int32_t v_min = (int32_t)(VOLTAGE_MIN_4S * 100.0f + 0.5f);
-        constexpr int32_t v_max = (int32_t)(VOLTAGE_MAX_4S * 100.0f + 0.5f);
-        if (v < v_min) v = v_min;
-        if (v > v_max) v = v_max;
-        uint8_t percent = ((v - v_min) * 100) / (v_max - v_min);
+        uint8_t percent = get_percent();
         if (percent < last_percent || percent > last_percent + 2) last_percent = percent;
 
         if (last_percent == 100) {
@@ -109,11 +107,47 @@ public:
     }
   }  //get_string
 
-  BATTERY_STATUS get_status() const {
-    if (cached_voltage < 6.0) return BATTERY_DISCONNECTED;
-    if (cached_voltage < VOLTAGE_MIN_4S) return BATTERY_LOW;
-    if (cached_voltage < VOLTAGE_LIMIT) return BATTERY_GOOD;
-    return BATTERY_OVERCHARGED;
+  BATTERY_STATUS get_status() {
+    if (cached_voltage < 6.0){
+      last_status = BATTERY_DISCONNECTED;
+      return last_status;
+    }
+
+    if (last_status == BATTERY_DISCONNECTED){
+      if (cached_voltage > VOLTAGE_MIN_4S){
+        last_status = BATTERY_GOOD;
+        return last_status;
+      } 
+    }
+
+    if (last_status == BATTERY_GOOD){
+      if (cached_voltage < VOLTAGE_MIN_4S){
+        last_status = BATTERY_LOW;
+        return last_status;
+      }
+    }
+
+    if (last_status == BATTERY_LOW){
+      if (cached_voltage > VOLTAGE_MIN_4S + 1){
+        last_status = BATTERY_GOOD;
+      } return last_status;
+    }
+
+    if (cached_voltage >= VOLTAGE_LIMIT){
+      last_status = BATTERY_OVERCHARGED;
+      return last_status;
+    } 
+    return last_status;
+  }
+
+  uint8_t get_percent(){
+    int32_t v = (int32_t)(cached_voltage * 100.0f + 0.5f);
+    constexpr int32_t v_min = (int32_t)(VOLTAGE_MIN_4S * 100.0f + 0.5f);
+    constexpr int32_t v_max = (int32_t)(VOLTAGE_MAX_4S * 100.0f + 0.5f);
+    if (v < v_min) v = v_min;
+    if (v > v_max) v = v_max;
+    uint8_t percent = ((v - v_min) * 100) / (v_max - v_min);
+    return percent;
   }
 
 private:

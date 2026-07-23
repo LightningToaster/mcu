@@ -1,9 +1,6 @@
-//XDL firmware 2026-7-16 -valkor
+//XDL firmware 2026-7-20 -valkor
 /*TODO
-revisit buzzer using blinkometer v3 class 
-compensate power with voltage
-low voltage probably flips back and forth.. better add a flag etc..
-you can make a better usa flag..
+
 */
 #define BLASTER_NAME "VALKONATOR MK2"
 #define BLASTER_OWNER "valkor"
@@ -13,23 +10,23 @@ you can make a better usa flag..
 
 #define PIN_SDA 0
 #define PIN_SCL 1
-#define PIN_MENU_SWITCH 5
-#define PIN_TRIGGER_SHALLOW 3
-#define PIN_TRIGGER_DEEP 2
-#define PIN_TRIGGER_TOUCH 4
-#define PIN_BUZZER 6  //passive, tone()
-#define PIN_UV 14
-#define PIN_IR_EMITTER 15
-#define PIN_IR_RECEIVER 29
-#define PIN_BATTERY 27
-#define PIN_SOLENOID 7
 #define PIN_ESC_0 8  //left esc, right motor
 #define PIN_ESC_1 9  //right esc, left motor
+#define PIN_SOLENOID 7
+#define PIN_MENU_SWITCH 5
+#define PIN_TRIGGER_TOUCH 4
+#define PIN_TRIGGER_SHALLOW 3
+#define PIN_TRIGGER_DEEP 2
+#define PIN_BATTERY 27
+#define PIN_IR_EMITTER 15
+#define PIN_IR_RECEIVER 29
+#define PIN_BUZZER 6  //passive, tone()
+#define PIN_UV 14
 
 #define REQUIRE_PIN false  //set to false to disable pinlock
 #define AUTOLOCK_INACTIVITY_MINUTES 30  //if require pin is enabled, will lock after this many minutes of inactivity
 
-#define MAX_POWER 60
+#define MAX_POWER 100 //just for limiting during testing
 #define ARMED true // wheels and solenoid will only operate if this is true
 #define RESET_SAVE false  //set true to override save with defaults
 #define IGNORE_DART_DETECTION true
@@ -75,7 +72,7 @@ void setup() {
   while (!Serial && millis() <= 1000) { delay(50); }
   wheels.begin();
   core.begin(PIN_SDA, PIN_SCL);
-  delay(2000);  //TODO consider when adding wheels
+  delay(2000);
   core.display_mode = display_menu;//overwritten by lockscreen if enabled
 }  //setup
 
@@ -97,7 +94,7 @@ void loop() {//print_loop_speed();
   uv_led.operate();
   DART_STATE dart_status = dart.operate();
   core.IR = dart.get_reflection();
-  bool wheels_revd = wheels.operate(10);
+  bool wheels_revd = wheels.operate();
   bool dart_was_fired = solenoid.operate(wheels_revd);
   if (dart_was_fired) { core.dart_fired();}
 
@@ -107,10 +104,9 @@ void loop() {//print_loop_speed();
       core.pin_failed = false;
       if (trigger_state == TRIGGER_TOUCH_END) {
         buzzer.beep(120, 30);
-        core.selected_char = (core.selected_char + 1) % PIN_LENGTH; //TODO core method()
+        core.next_char_position();
       } else if (trigger_state == TRIGGER_SHALLOW_END) { 
-        core.pin_entered[core.selected_char] =
-          ((core.pin_entered[core.selected_char] - '0' + 1) % 10) + '0';//TODO core method()
+        core.increment_number_entry();
         buzzer.beep(300, 50);
       } else if (trigger_state == TRIGGER_DEEP_END) {
         if (pinlock.verify(core.pin_entered) == true) {  //correct pin entered
@@ -144,6 +140,7 @@ void loop() {//print_loop_speed();
   if (menu_switch_state == SWITCH_CLOSED or menu_switch_state == SWITCH_CLOSED_ACTION) {
     solenoid.stop();
     wheels.stop();
+    uv_led.fade(0);
     if (core.display_mode == display_menu) {
       switch (trigger_state) {
         case TRIGGER_TOUCH_END:  //cycle through settings
@@ -173,7 +170,8 @@ void loop() {//print_loop_speed();
         case TRIGGER_DEEP_END:
           if (core.selection == 0){
             core.display_mode = display_metrics;
-            buzzer.beep(180, 80);
+            //buzzer.beep(180, 80);
+            buzzer.effect_next_menu();
           }
 
         case TRIGGER_DEEP_INCREMENT:
@@ -195,7 +193,7 @@ void loop() {//print_loop_speed();
             core.display_mode = display_menu; 
           break;
         }
-        buzzer.beep(180, 80);
+        buzzer.effect_next_menu();
       }else if (trigger_state == TRIGGER_SHALLOW_END){
         if (core.display_mode == display_info or core.display_mode == display_logo){
             core.logo_index = (core.logo_index + 1) % LOGO_COUNT;
@@ -204,7 +202,8 @@ void loop() {//print_loop_speed();
           }else{
             core.display_mode = display_logo;
           }
-          buzzer.beep(350, 30);
+          //buzzer.beep(350, 30);
+          buzzer.effect_next_logo();
         }
         
       }//shallow_end?
@@ -220,7 +219,8 @@ void loop() {//print_loop_speed();
             uv_led.fade(0);
           break;
           default:
-            wheels.set_throttle_percentage(core.get_power());
+            wheels.set_throttle_percentage(core.get_power(), battery.get_percent());
+            //wheels.set_throttle_percentage(core.get_power(), 50);
             switch (core.get_glow()){
               case 1: uv_led.fade(10); break;
               case 2: uv_led.set(70); break;
@@ -266,6 +266,7 @@ void loop() {//print_loop_speed();
       wheels.stop();
       uv_led.fade(0);
       core.display_mode = display_battery;
+      //buzzer.effect_battery_low();//TODO a way to only fire once
     }
   }//is_menu?
 }//loop

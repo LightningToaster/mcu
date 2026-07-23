@@ -181,6 +181,16 @@ public:
     settings.launched++; 
     settings_dirty = true;
   }
+
+  void increment_number_entry(){
+    pin_entered[selected_char] =
+      ((pin_entered[selected_char] - '0' + 1) % 10) + '0';
+  }
+
+  void next_char_position(){
+    selected_char = (selected_char + 1) % PIN_LENGTH; 
+  }
+  
 private:
   unsigned long last_frame = 0;
   static constexpr uint32_t frame_ms = 33;

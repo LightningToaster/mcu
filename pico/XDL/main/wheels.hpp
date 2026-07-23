@@ -1,4 +1,4 @@
-//valkor nov 2025?
+//valkor 2026-7-20
 #include <Servo.h>
 //some values from MK1
 //1115=20fps
@@ -7,12 +7,13 @@
 class Wheels {
 
 private:
-  static constexpr uint16_t THROTTLE_ARM = 1030;   // below for reliability?
-  static constexpr uint16_t THROTTLE_IDLE = 1038;  // seems quiet
+  static constexpr uint16_t THROTTLE_ARM = 1030;
+  static constexpr uint16_t THROTTLE_IDLE = 1038;  // seems quiet 1038
   static constexpr uint16_t THROTTLE_MIN = 1115;   // determines lowest fps allowed
-  //TODO may want a "hard max".. so that there is headroom for higher throttle if voltage low
-  //.. or dont?  MAX_POWER might not be set to 100?  idk
-  static constexpr uint16_t THROTTLE_MAX = 1960;   // determines maximum fps allowed
+  static constexpr uint16_t THROTTLE_100 = 1655;   // determines maximum fps allowed
+  static constexpr uint16_t MAX_BATTERY_COMPENSATION = 100;//at 60% battery, 40 will be added to throttle
+  static constexpr uint16_t THROTTLE_MAX = 1960;   // MAX throttle value for ESC
+  static constexpr int8_t THROTTLE_BALANCE = -4;   // negative makes the left faster.  positive makes the right faster.
   static constexpr uint16_t ESC_ARM_DELAY = 3000;  // ms to allow escs to arm
 
   uint8_t pin_esc_left;
@@ -41,14 +42,25 @@ public:
     begun = true;
   }
 
-  bool operate(uint8_t uv = 1) {
+  bool operate() {
     if (not begun) (begin());
     uint32_t now = millis();
     if (now < ESC_ARM_DELAY) { return false; }
 
+    uint16_t left = speed_now;
+    uint16_t right = speed_now;
+    if (speed_now != THROTTLE_ARM and speed_now != THROTTLE_IDLE){
+      if (THROTTLE_BALANCE < 0){
+        left += abs(THROTTLE_BALANCE);
+      }else if (THROTTLE_BALANCE > 0){
+        right += THROTTLE_BALANCE;
+      }
+    }
+    
+
     if (ARMED == true){
-      motor_left.writeMicroseconds(speed_now);
-      motor_right.writeMicroseconds(speed_now);
+      motor_left.writeMicroseconds(left);
+      motor_right.writeMicroseconds(right);
     }
     
 
@@ -88,21 +100,44 @@ public:
     return (difference <= 5);
   }  // operate
 
-  void set_throttle_percentage(uint8_t percentage) {
+  void set_throttle_percentage(uint8_t throttle_percent, uint8_t voltage_percent = 0) {
     uint32_t now = millis();
-    if (now < ESC_ARM_DELAY || percentage == 0) {
+    if (now < ESC_ARM_DELAY || throttle_percent == 0) {
       speed_goal = THROTTLE_ARM;
       return;
     }
-    if (percentage > 100) { percentage = 100; }
-    int16_t new_percentage = map(percentage, 1, 100, THROTTLE_MIN, THROTTLE_MAX);
-    speed_goal = static_cast<uint16_t>(new_percentage);
+    if (throttle_percent > 100) { throttle_percent = 100; }
+    int16_t new_throttle = map(throttle_percent, 1, 100, THROTTLE_MIN, THROTTLE_100);
+    Serial.print(new_throttle);
+    new_throttle += map(100-voltage_percent, 0, 100, 0, MAX_BATTERY_COMPENSATION);
+    if (new_throttle > THROTTLE_MAX){
+      new_throttle = THROTTLE_MAX;
+    }
+    Serial.print(" -> ");
+    Serial.println(new_throttle);
+    speed_goal = static_cast<uint16_t>(new_throttle);
 
     if (ms_started_spin == 0) {
       ms_started_spin = now;
     }
     braking = false;
   }  // set_speed
+
+  // void set_throttle_percentage(uint8_t percentage) {
+  //   uint32_t now = millis();
+  //   if (now < ESC_ARM_DELAY || percentage == 0) {
+  //     speed_goal = THROTTLE_ARM;
+  //     return;
+  //   }
+  //   if (percentage > 100) { percentage = 100; }
+  //   int16_t new_percentage = map(percentage, 1, 100, THROTTLE_MIN, THROTTLE_MAX);
+  //   speed_goal = static_cast<uint16_t>(new_percentage);
+
+  //   if (ms_started_spin == 0) {
+  //     ms_started_spin = now;
+  //   }
+  //   braking = false;
+  // }  // set_speed
 
   void idle() {
     speed_goal = THROTTLE_IDLE;

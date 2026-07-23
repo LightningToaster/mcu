@@ -1,5 +1,19 @@
-#pragma once
 //valkor 2026-07-16
+/*if a settings screen was added it could have:
+solenoid timing adjustment ms
+toggle pinlock (complicated, would required changing how that works)
+inactivity lockout minutes
+menu voltage format
+start up logo index
+brake rate
+motor idling OFF LOW MED HIGH?  or ON OFF?
+motor call mode?  OFF LEFT RIGHT (disables solenoid)
+
+
+
+(not to be confused with the menu, which is just for profile stuff
+, maybe it should be called the dashboard idk)
+*/
 #include <Adafruit_GFX.h>
 #include <Adafruit_SH110X.h>
 #include "logos.hpp"
